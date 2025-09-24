@@ -1,9 +1,18 @@
-const API_BASE = process.env.REACT_APP_API_BASE_URL || 'http://localhost:4000/api';
+// src/utils/api.js
+const API_BASE = process.env.REACT_APP_API_BASE_URL || 
+                 process.env.NEXT_PUBLIC_API_URL || 
+                 'http://localhost:4000/api';
+
+console.log('API Base URL:', API_BASE); // Debugging
 
 // Fungsi helper untuk fetch API
 async function fetchAPI(endpoint, options = {}) {
-  const url = `${API_BASE}${endpoint}`;
+  // Normalize endpoint (remove leading slash if present)
+  const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const url = `${API_BASE}${normalizedEndpoint}`;
   
+  console.log('API Call:', url); // Debugging
+
   const config = {
     headers: {
       'Content-Type': 'application/json',
@@ -21,7 +30,9 @@ async function fetchAPI(endpoint, options = {}) {
     const response = await fetch(url, config);
     
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorText = await response.text();
+      console.error('API Error Response:', errorText);
+      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
     }
     
     return await response.json();
@@ -31,27 +42,72 @@ async function fetchAPI(endpoint, options = {}) {
   }
 }
 
-// API functions
-export async function createTicket({ name, division, description, photoFile, priority }) {
+// API functions untuk Helpdesk Tickets
+export async function createTicket(ticketData) {
+  const { name, division, description, photo, priority } = ticketData;
+  
   const fd = new FormData();
-  if (name) fd.append('name', name);
-  if (division) fd.append('division', division);
-  if (priority) fd.append('priority', priority);
+  fd.append('name', name || '');
+  fd.append('division', division || '');
   fd.append('description', description || '');
-  if (photoFile) fd.append('photo', photoFile);
+  fd.append('priority', priority || 'Normal');
+  
+  if (photo) {
+    fd.append('photo', photo);
+  }
 
-  const r = await fetchAPI('/tickets', {
+  console.log('Creating ticket with data:', {
+    name, division, description, priority, hasPhoto: !!photo
+  });
+
+  return fetchAPI('/tickets', {
     method: 'POST',
     body: fd,
   });
-
-  if (!r.ok) {
-    throw new Error(r?.error || `Failed to create ticket`);
-  }
-  return r; // { ok:true, row, ticketId }
 }
 
-// Tambahkan fungsi API lainnya sesuai kebutuhan
+export async function getTickets(params = {}) {
+  const queryParams = new URLSearchParams();
+  
+  if (params.status) queryParams.append('status', params.status);
+  if (params.page) queryParams.append('page', params.page);
+  if (params.limit) queryParams.append('limit', params.limit);
+  
+  const queryString = queryParams.toString();
+  const endpoint = queryString ? `/tickets?${queryString}` : '/tickets';
+  
+  return fetchAPI(endpoint);
+}
+
+export async function getTicketById(id) {
+  return fetchAPI(`/tickets/${id}`);
+}
+
+export async function resolveTicket(id, data) {
+  return fetchAPI(`/tickets/${id}/resolve`, {
+    method: 'POST',
+    body: JSON.stringify(data)
+  });
+}
+
+export async function declineTicket(id, data) {
+  return fetchAPI(`/tickets/${id}/decline`, {
+    method: 'POST',
+    body: JSON.stringify(data)
+  });
+}
+
+export async function deleteTicket(id) {
+  return fetchAPI(`/tickets/${id}`, {
+    method: 'DELETE'
+  });
+}
+
+export async function getDashboardStats() {
+  return fetchAPI('/dashboard/stats');
+}
+
+// API functions untuk Inventory (jika diperlukan)
 export async function getDevices() {
   return fetchAPI('/devices');
 }
@@ -64,21 +120,19 @@ export async function getPeripherals() {
   return fetchAPI('/peripherals');
 }
 
-export async function getTickets() {
-  return fetchAPI('/helpdesk/tickets');
+// Health check
+export async function healthCheck() {
+  return fetchAPI('/health');
 }
 
-export async function updateTicket(id, data) {
-  return fetchAPI(`/helpdesk/tickets/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(data)
-  });
-}
-
-export async function deleteTicket(id) {
-  return fetchAPI(`/helpdesk/tickets/${id}`, {
-    method: 'DELETE'
-  });
+// Test connection
+export async function testConnection() {
+  try {
+    const result = await healthCheck();
+    return { success: true, data: result };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
 }
 
 export { API_BASE };

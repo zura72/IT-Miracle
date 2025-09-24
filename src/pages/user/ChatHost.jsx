@@ -5,7 +5,8 @@ import "./ChatHost.css";
 
 /* ===================== API URL HELPER ===================== */
 export function apiUrl(path = "") {
-  const base = process.env.REACT_APP_API_BASE || "http://localhost:4000/api";
+  // Gunakan URL Railway sebagai default
+  const base = process.env.REACT_APP_API_BASE || "https://it-backend-production.up.railway.app/api";
   const normalizedBase = base.endsWith('/') ? base.slice(0, -1) : base;
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   return `${normalizedBase}${normalizedPath}`;
@@ -17,20 +18,23 @@ export function apiUrl(path = "") {
  */
 async function testApiConnection() {
   try {
-    // Gunakan endpoint health check atau endpoint yang selalu tersedia
-    const url = apiUrl("/health"); 
+    // Gunakan endpoint yang lebih umum untuk test koneksi
+    const url = apiUrl(""); 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // Timeout lebih lama untuk production
 
     const response = await fetch(url, {
       method: 'GET',
-      signal: controller.signal
+      signal: controller.signal,
+      headers: {
+        'Accept': 'application/json',
+      }
     });
 
     clearTimeout(timeoutId);
 
-    // Anggap berhasil jika status 2xx atau 4xx (karena endpoint mungkin tidak ada tapi server merespon)
-    return response.status !== 404;
+    // Anggap berhasil jika server merespon (bahkan 404 OK)
+    return response.status !== 0 && response.status < 500;
   } catch (error) {
     console.warn('API connection test failed:', error);
     return false;
@@ -67,6 +71,10 @@ function useApiConnectionTest() {
 
   // Test koneksi saat component mount
   useEffect(() => {
+    console.log("API Base URL:", apiUrl());
+    console.log("Environment:", process.env.NODE_ENV);
+    console.log("REACT_APP_API_BASE:", process.env.REACT_APP_API_BASE);
+    
     testConnection();
 
     // Test koneksi dengan interval yang adaptif
@@ -142,11 +150,7 @@ async function createTicket({ name, division = "", description, photo }) {
   // Debug: log data yang akan dikirim
   console.log("Mengirim tiket dengan data:", ticketData);
   console.log("Photo file:", photo);
-
-  // Debug: log FormData contents
-  for (let [key, value] of fd.entries()) {
-    console.log(`FormData: ${key} =`, value);
-  }
+  console.log("API URL:", apiUrl("/tickets"));
 
   const url = apiUrl("/tickets");
   
@@ -154,26 +158,47 @@ async function createTicket({ name, division = "", description, photo }) {
     const response = await fetch(url, {
       method: "POST",
       body: fd,
-      // Jangan set Content-Type header, biarkan browser set otomatis untuk FormData
+      credentials: 'include',
     });
 
     console.log("Response status:", response.status);
+    console.log("Response headers:", Object.fromEntries(response.headers.entries()));
     
     if (!response.ok) {
       let errorText = "Unknown error";
       try {
         errorText = await response.text();
+        // Coba parse sebagai JSON jika mungkin
+        const errorJson = JSON.parse(errorText);
+        errorText = errorJson.message || errorJson.error || errorText;
       } catch (e) {
+        // Jika bukan JSON, gunakan text biasa
         errorText = `HTTP ${response.status} - ${response.statusText}`;
       }
       throw new Error(`Gagal membuat tiket (HTTP ${response.status}): ${errorText}`);
     }
 
-    const result = await response.json();
+    const contentType = response.headers.get("content-type");
+    let result;
+    
+    if (contentType && contentType.includes("application/json")) {
+      result = await response.json();
+    } else {
+      const textResult = await response.text();
+      console.warn("Response bukan JSON:", textResult);
+      result = { success: true, message: "Tiket berhasil dibuat" };
+    }
+    
     console.log("Ticket created successfully:", result);
     return result;
   } catch (error) {
     console.error("Error creating ticket:", error);
+    
+    // Handle CORS errors specifically
+    if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+      throw new Error(`Gagal terhubung ke server. Pastikan backend di ${url} dapat diakses dan mengizinkan CORS.`);
+    }
+    
     throw new Error(`Gagal membuat tiket: ${error.message}`);
   }
 }
@@ -698,13 +723,35 @@ export default function ChatHost() {
     setIsTyping(true);
     pushBot(<span>Memeriksa koneksi server...</span>);
     
-    const connected = await testConnection();
-    
-    setIsTyping(false);
-    if (connected) {
-      pushBot(<span className="success-message">Koneksi berhasil dipulihkan! 🎉</span>);
-    } else {
-      pushBot(<span className="error-message">Server masih offline. Silakan coba lagi nanti.</span>);
+    try {
+      const connected = await testConnection();
+      
+      setIsTyping(false);
+      if (connected) {
+        pushBot(<span className="success-message">Koneksi berhasil dipulihkan! 🎉</span>);
+        
+        // Jika sebelumnya offline dan sekarang online, refresh UI state
+        if (!isOnline) {
+          // Optional: reload page untuk reset state
+          window.location.reload();
+        }
+      } else {
+        pushBot(
+          <div className="error-message">
+            Server masih offline. 
+            <div style={{ marginTop: "8px", fontSize: "12px" }}>
+              Pastikan backend di <code>https://it-backend-production.up.railway.app</code> sedang berjalan.
+            </div>
+          </div>
+        );
+      }
+    } catch (error) {
+      setIsTyping(false);
+      pushBot(
+        <div className="error-message">
+          Error saat test koneksi: {error.message}
+        </div>
+      );
     }
   };
 
