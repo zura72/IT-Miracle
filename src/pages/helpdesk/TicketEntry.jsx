@@ -3,27 +3,29 @@ import { useMsal } from "@azure/msal-react";
 import { useTheme } from "../../context/ThemeContext";
 import { motion, AnimatePresence } from "framer-motion";
 
-// API Configuration
-const API_BASE = import.meta.env?.VITE_API_BASE || process.env.REACT_APP_API_BASE || "/api";
-const CREDENTIALS_MODE = API_BASE.startsWith("http") ? "include" : "same-origin";
-
-// API Helper Functions
+// API Functions - menggunakan fetch untuk berkomunikasi dengan server
 const apiRequest = async (endpoint, options = {}) => {
-  const url = `${API_BASE.replace(/\/+$/, "")}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
-  const response = await fetch(url, {
-    credentials: CREDENTIALS_MODE,
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-    ...options,
-  });
+  const baseUrl = process.env.REACT_APP_API_URL || "http://localhost:4000";
+  const url = `${baseUrl}${endpoint}`;
+  
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+      ...options,
+    });
 
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('API request failed:', error);
+    throw error;
   }
-
-  return response.json();
 };
 
 // Animation variants
@@ -34,11 +36,6 @@ const fadeIn = {
 
 const staggerChildren = {
   visible: { transition: { staggerChildren: 0.1 } }
-};
-
-const scaleIn = {
-  hidden: { opacity: 0, scale: 0.8 },
-  visible: { opacity: 1, scale: 1, transition: { duration: 0.3 } }
 };
 
 const slideIn = {
@@ -72,23 +69,28 @@ const StatCard = ({ title, value, color, darkMode, index }) => {
 // Component untuk menampilkan priority badge
 const PriorityBadge = ({ priority, darkMode }) => {
   const priorityConfig = {
-    urgent: { color: "red", icon: "🔥" },
-    high: { color: "orange", icon: "⚠️" },
-    normal: { color: "blue", icon: "ℹ️" },
-    low: { color: "green", icon: "💤" },
+    urgent: { color: "red", icon: "🔥", text: "Urgent" },
+    high: { color: "orange", icon: "⚠️", text: "High" },
+    normal: { color: "blue", icon: "ℹ️", text: "Normal" },
+    low: { color: "green", icon: "💤", text: "Low" },
   };
 
-  const config = priorityConfig[priority.toLowerCase()] || priorityConfig.normal;
+  const config = priorityConfig[priority?.toLowerCase()] || priorityConfig.normal;
   
+  const colorClasses = {
+    red: darkMode ? "bg-red-900/30 text-red-300" : "bg-red-100 text-red-800",
+    orange: darkMode ? "bg-orange-900/30 text-orange-300" : "bg-orange-100 text-orange-800",
+    blue: darkMode ? "bg-blue-900/30 text-blue-300" : "bg-blue-100 text-blue-800",
+    green: darkMode ? "bg-green-900/30 text-green-300" : "bg-green-100 text-green-800",
+  };
+
   return (
     <motion.span 
-      className={`px-3 py-1 rounded-full text-sm font-medium ${
-        darkMode ? `bg-${config.color}-900/30 text-${config.color}-300` : `bg-${config.color}-100 text-${config.color}-800`
-      }`}
+      className={`px-3 py-1 rounded-full text-sm font-medium ${colorClasses[config.color]}`}
       whileHover={{ scale: 1.1 }}
       transition={{ type: "spring", stiffness: 400, damping: 10 }}
     >
-      {config.icon} {priority}
+      {config.icon} {config.text}
     </motion.span>
   );
 };
@@ -142,27 +144,28 @@ export default function TicketEntry() {
   const user = accounts[0];
   const userName = user?.name || "Admin";
 
-  // Stats calculation
+  // Stats calculation berdasarkan data real
   const stats = {
     total: tickets.length,
-    urgent: tickets.filter(t => t.priority.toLowerCase() === "urgent").length,
-    high: tickets.filter(t => t.priority.toLowerCase() === "high").length,
-    normal: tickets.filter(t => t.priority.toLowerCase() === "normal").length,
+    urgent: tickets.filter(t => t.priority && t.priority.toLowerCase() === "urgent").length,
+    high: tickets.filter(t => t.priority && t.priority.toLowerCase() === "high").length,
+    normal: tickets.filter(t => t.priority && t.priority.toLowerCase() === "normal").length,
+    belum: tickets.filter(t => t.status === "Belum").length,
   };
 
-  // Load tickets
+  // Load tickets dari server
   useEffect(() => {
     loadTickets();
   }, []);
 
-  // Filter tickets based on search query
+  // Filter tickets berdasarkan search query
   useEffect(() => {
     const query = searchQuery.toLowerCase();
     const filtered = tickets.filter(ticket => 
-      ticket.ticketNo.toLowerCase().includes(query) ||
-      ticket.user.toLowerCase().includes(query) ||
-      ticket.department.toLowerCase().includes(query) ||
-      ticket.description.toLowerCase().includes(query)
+      (ticket.ticketNo && ticket.ticketNo.toLowerCase().includes(query)) ||
+      (ticket.name && ticket.name.toLowerCase().includes(query)) ||
+      (ticket.division && ticket.division.toLowerCase().includes(query)) ||
+      (ticket.description && ticket.description.toLowerCase().includes(query))
     );
     setFilteredTickets(filtered);
   }, [searchQuery, tickets]);
@@ -170,34 +173,32 @@ export default function TicketEntry() {
   const loadTickets = async () => {
     try {
       setLoading(true);
+      setError("");
+      
+      // Mengambil tiket dengan status "Belum" dari server
       const data = await apiRequest("/api/tickets?status=Belum");
-      setTickets(data.rows || []);
+      
+      // Format data sesuai dengan struktur yang diharapkan komponen
+      const formattedTickets = (data.rows || []).map(ticket => ({
+        id: ticket._id || ticket.id,
+        ticketNo: ticket.ticketNo,
+        createdAt: ticket.createdAt,
+        user: ticket.name,
+        department: ticket.division,
+        priority: ticket.priority || "Normal",
+        description: ticket.description,
+        assignee: ticket.assignee || userName,
+        attachment: ticket.photo,
+        status: ticket.status,
+        notes: ticket.notes,
+        operator: ticket.operator
+      }));
+      
+      setTickets(formattedTickets);
     } catch (err) {
-      setError("Gagal memuat tiket: " + err.message);
-      setTickets([
-        {
-          id: 1,
-          ticketNo: "TKT-001",
-          createdAt: new Date().toISOString(),
-          user: "John Doe",
-          department: "IT",
-          priority: "Urgent",
-          description: "Keyboard tidak berfungsi",
-          assignee: userName,
-          attachment: null
-        },
-        {
-          id: 2,
-          ticketNo: "TKT-002",
-          createdAt: new Date().toISOString(),
-          user: "Jane Smith",
-          department: "HR",
-          priority: "High",
-          description: "Printer bermasalah",
-          assignee: userName,
-          attachment: null
-        }
-      ]);
+      console.error("Error loading tickets:", err);
+      setError("Gagal memuat tiket: " + (err.message || "Koneksi ke server gagal"));
+      setTickets([]); // Reset tickets jika error
     } finally {
       setLoading(false);
     }
@@ -205,48 +206,60 @@ export default function TicketEntry() {
 
   const handleResolve = async (ticketId, notes, file) => {
     try {
-      const formData = new FormData();
-      if (file) formData.append("photo", file);
-      if (notes) formData.append("notes", notes);
-      formData.append("operator", userName);
-
+      setError("");
+      
       await apiRequest(`/api/tickets/${ticketId}/resolve`, {
         method: "POST",
-        body: formData,
-        headers: {}
+        body: JSON.stringify({
+          notes: notes || "",
+          operator: userName
+        })
       });
 
       setSuccess("Ticket berhasil diselesaikan");
       setActiveModal(null);
-      loadTickets();
+      await loadTickets(); // Reload data setelah update
     } catch (err) {
-      setError("Gagal menyelesaikan tiket: " + err.message);
+      console.error("Error resolving ticket:", err);
+      setError("Gagal menyelesaikan tiket: " + (err.message || "Terjadi kesalahan"));
     }
   };
 
   const handleDecline = async (ticketId, reason) => {
     try {
+      setError("");
+      
       await apiRequest(`/api/tickets/${ticketId}/decline`, {
         method: "POST",
-        body: JSON.stringify({ notes: reason, operator: userName })
+        body: JSON.stringify({
+          notes: reason || "",
+          operator: userName
+        })
       });
 
       setSuccess("Ticket berhasil ditolak");
       setActiveModal(null);
-      loadTickets();
+      await loadTickets(); // Reload data setelah update
     } catch (err) {
-      setError("Gagal menolak tiket: " + err.message);
+      console.error("Error declining ticket:", err);
+      setError("Gagal menolak tiket: " + (err.message || "Terjadi kesalahan"));
     }
   };
 
   const handleDelete = async (ticketId) => {
     try {
-      await apiRequest(`/api/tickets/${ticketId}`, { method: "DELETE" });
+      setError("");
+      
+      await apiRequest(`/api/tickets/${ticketId}`, { 
+        method: "DELETE" 
+      });
+
       setSuccess("Ticket berhasil dihapus");
       setActiveModal(null);
-      loadTickets();
+      await loadTickets(); // Reload data setelah delete
     } catch (err) {
-      setError("Gagal menghapus tiket: " + err.message);
+      console.error("Error deleting ticket:", err);
+      setError("Gagal menghapus tiket: " + (err.message || "Terjadi kesalahan"));
     }
   };
 
@@ -286,8 +299,8 @@ export default function TicketEntry() {
             animate="visible"
           >
             <StatCard title="Total" value={stats.total} color="blue" darkMode={darkMode} index={0} />
-            <StatCard title="Urgent" value={stats.urgent} color="red" darkMode={darkMode} index={1} />
-            <StatCard title="High" value={stats.high} color="orange" darkMode={darkMode} index={2} />
+            <StatCard title="Belum" value={stats.belum} color="orange" darkMode={darkMode} index={1} />
+            <StatCard title="Urgent" value={stats.urgent} color="red" darkMode={darkMode} index={2} />
           </motion.div>
         </div>
 
@@ -304,7 +317,7 @@ export default function TicketEntry() {
             >
               <input
                 type="text"
-                placeholder="Cari tiket..."
+                placeholder="Cari tiket berdasarkan nomor, nama, divisi, atau deskripsi..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className={`w-full px-4 py-3 rounded-xl border ${
@@ -397,7 +410,7 @@ export default function TicketEntry() {
               <tr className={darkMode ? "bg-gray-700" : "bg-gray-100"}>
                 <th className="p-4 text-left">Ticket #</th>
                 <th className="p-4 text-left">User</th>
-                <th className="p-4 text-left">Department</th>
+                <th className="p-4 text-left">Divisi</th>
                 <th className="p-4 text-left">Priority</th>
                 <th className="p-4 text-left">Description</th>
                 <th className="p-4 text-left">Assignee</th>
@@ -419,7 +432,7 @@ export default function TicketEntry() {
               ) : filteredTickets.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="p-8 text-center text-gray-500">
-                    {searchQuery ? "Tidak ada tiket yang cocok dengan pencarian" : "Tidak ada tiket"}
+                    {searchQuery ? "Tidak ada tiket yang cocok dengan pencarian" : "Tidak ada tiket yang belum diproses"}
                   </td>
                 </tr>
               ) : (
@@ -529,7 +542,9 @@ const ResolveModal = ({ ticket, onClose, onSubmit, darkMode }) => {
           <input
             type="file"
             onChange={(e) => setFile(e.target.files[0])}
-            className="w-full p-2 border rounded"
+            className={`w-full p-2 border rounded ${
+              darkMode ? "bg-gray-700 border-gray-600" : "border-gray-300"
+            }`}
           />
         </div>
         <div>
@@ -547,7 +562,9 @@ const ResolveModal = ({ ticket, onClose, onSubmit, darkMode }) => {
         <div className="flex gap-2 justify-end">
           <motion.button
             onClick={onClose}
-            className="px-4 py-2 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+            className={`px-4 py-2 border rounded-lg ${
+              darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"
+            }`}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
@@ -589,7 +606,9 @@ const DeclineModal = ({ ticket, onClose, onSubmit, darkMode }) => {
         <div className="flex gap-2 justify-end">
           <motion.button
             onClick={onClose}
-            className="px-4 py-2 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+            className={`px-4 py-2 border rounded-lg ${
+              darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"
+            }`}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
@@ -618,7 +637,9 @@ const DeleteModal = ({ ticket, onClose, onSubmit, darkMode }) => {
         <div className="flex gap-2 justify-end">
           <motion.button
             onClick={onClose}
-            className="px-4 py-2 border rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+            className={`px-4 py-2 border rounded-lg ${
+              darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"
+            }`}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >

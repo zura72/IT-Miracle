@@ -1,4 +1,3 @@
-// src/routes.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { useMsal } from "@azure/msal-react";
@@ -19,7 +18,7 @@ import TicketSolved from "./pages/helpdesk/TicketSolved";
 import DataSharepoint from "./pages/helpdesk/DataSharepoint";
 import ChatHost from "./pages/user/ChatHost";
 
-/* ============= Admin helpers (pakai constants/admins) ============= */
+/* ============= Admin helpers ============= */
 import {
   getAdminSetCached,
   resolveMsalEmail,
@@ -27,9 +26,7 @@ import {
 } from "./constants/admin";
 
 /* ============= dev-only logger ============= */
-const isDev =
-  (typeof import.meta !== "undefined" && import.meta.env?.MODE === "development") ||
-  process.env.NODE_ENV === "development";
+const isDev = process.env.NODE_ENV === "development";
 const dev = {
   log: (...a) => isDev && console.log(...a),
   warn: (...a) => isDev && console.warn(...a),
@@ -38,46 +35,52 @@ const dev = {
 /* ============= Admin Gate Hook ============= */
 function useAdminGate() {
   const { accounts } = useMsal();
-  const [adminSet, setAdminSet] = useState(null); // Set<string>
+  const [adminSet, setAdminSet] = useState(null);
 
   const email = useMemo(() => resolveMsalEmail(accounts?.[0]), [accounts]);
 
   useEffect(() => {
-    let alive = true;
-    (async () => {
-      const set = await getAdminSetCached();
-      if (alive) setAdminSet(set);
-    })();
+    let isMounted = true;
+    
+    const loadAdminSet = async () => {
+      try {
+        const set = await getAdminSetCached();
+        if (isMounted) setAdminSet(set);
+      } catch (error) {
+        dev.warn("Failed to load admin set:", error);
+        if (isMounted) setAdminSet(new Set());
+      }
+    };
+
+    loadAdminSet();
+
     return () => {
-      alive = false;
+      isMounted = false;
     };
   }, []);
 
   const ready = adminSet !== null;
-  const isAdmin =
-    ready &&
-    !!email &&
-    (adminSet.has(email) || email === FALLBACK_ADMIN_EMAIL);
+  const isAdmin = ready && !!email && (adminSet.has(email) || email === FALLBACK_ADMIN_EMAIL);
 
   return { ready, isAdmin, email };
 }
 
 /* ============= Guards & Layout ============= */
 function RequireAdmin({ children }) {
-  const { ready, isAdmin /*, email*/ } = useAdminGate();
-  if (!ready) return <div className="p-6">Loading…</div>;
-  if (!isAdmin) {
-    // jangan spam console, langsung redirect saja
-    return <Navigate to="/chat" replace />;
-  }
+  const { ready, isAdmin } = useAdminGate();
+  
+  if (!ready) return <div className="p-6 flex justify-center items-center min-h-screen">Loading…</div>;
+  if (!isAdmin) return <Navigate to="/chat" replace />;
+  
   return children;
 }
 
 function ThemedLayout({ children }) {
   const [dark, setDark] = useState(() => {
-    const t = localStorage.getItem("theme");
-    return t ? t === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const savedTheme = localStorage.getItem("theme");
+    return savedTheme ? savedTheme === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
   });
+
   useEffect(() => {
     const root = document.documentElement;
     if (dark) {
@@ -91,8 +94,10 @@ function ThemedLayout({ children }) {
 
   return (
     <div className="flex bg-gray-100 dark:bg-gray-900 min-h-screen">
-      <Sidebar dark={dark} toggleDark={() => setDark((v) => !v)} />
-      <div className="flex-1 p-6 md:p-10">{children}</div>
+      <Sidebar dark={dark} toggleDark={() => setDark(v => !v)} />
+      <main className="flex-1 p-6 md:p-10 overflow-auto">
+        {children}
+      </main>
     </div>
   );
 }
@@ -100,19 +105,33 @@ function ThemedLayout({ children }) {
 /* ============= Landing decider ============= */
 function LandingRouter() {
   const { ready, isAdmin, email } = useAdminGate();
-  const nav = useNavigate();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!ready) return;
+    
     const target = isAdmin ? "/dashboard" : "/chat";
     dev.log("[LandingRouter] email:", email, "→", target);
-    nav(target, { replace: true }); // gunakan replace agar tidak ada history back ke "/"
-  }, [ready, isAdmin, nav, email]);
+    navigate(target, { replace: true });
+  }, [ready, isAdmin, navigate, email]);
 
-  return <div className="p-6">Mengarahkan…</div>;
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-lg">Mengarahkan…</div>
+    </div>
+  );
 }
 
-/* ============= Routes ============= */
+/* ============= Helper component untuk admin routes ============= */
+const AdminLayout = ({ children }) => (
+  <RequireAdmin>
+    <ThemedLayout>
+      {children}
+    </ThemedLayout>
+  </RequireAdmin>
+);
+
+/* ============= Main Routes Component ============= */
 export default function AppRoutes() {
   return (
     <Routes>
@@ -122,129 +141,69 @@ export default function AppRoutes() {
       {/* CHAT fullscreen (tanpa sidebar) */}
       <Route path="/chat" element={<ChatHost />} />
 
-      {/* ADMIN layout */}
-      <Route
-        path="/dashboard"
-        element={
-          <RequireAdmin>
-            <ThemedLayout>
-              <Dashboard />
-            </ThemedLayout>
-          </RequireAdmin>
-        }
-      />
-      <Route
-        path="/devices"
-        element={
-          <RequireAdmin>
-            <ThemedLayout>
-              <Devices />
-            </ThemedLayout>
-          </RequireAdmin>
-        }
-      />
-      <Route
-        path="/peripheral"
-        element={
-          <RequireAdmin>
-            <ThemedLayout>
-              <Peripheral />
-            </ThemedLayout>
-          </RequireAdmin>
-        }
-      />
-      <Route
-        path="/licenses"
-        element={
-          <RequireAdmin>
-            <ThemedLayout>
-              <Licenses />
-            </ThemedLayout>
-          </RequireAdmin>
-        }
-      />
-      <Route
-        path="/settings"
-        element={
-          <RequireAdmin>
-            <ThemedLayout>
-              <Settings />
-            </ThemedLayout>
-          </RequireAdmin>
-        }
-      />
-      <Route
-        path="/charts/license"
-        element={
-          <RequireAdmin>
-            <ThemedLayout>
-              <ChartsLicense />
-            </ThemedLayout>
-          </RequireAdmin>
-        }
-      />
-      <Route
-        path="/charts/peripheral"
-        element={
-          <RequireAdmin>
-            <ThemedLayout>
-              <ChartsPeripheral />
-            </ThemedLayout>
-          </RequireAdmin>
-        }
-      />
-      <Route
-        path="/charts/device"
-        element={
-          <RequireAdmin>
-            <ThemedLayout>
-              <ChartsDevice />
-            </ThemedLayout>
-          </RequireAdmin>
-        }
-      />
-      <Route
-        path="/charts/helpdesk"
-        element={
-          <RequireAdmin>
-            <ThemedLayout>
-              <ChartHelpdesk />
-            </ThemedLayout>
-          </RequireAdmin>
-        }
-      />
-      <Route
-        path="/helpdesk/entry"
-        element={
-          <RequireAdmin>
-            <ThemedLayout>
-              <TicketEntry />
-            </ThemedLayout>
-          </RequireAdmin>
-        }
-      />
-      <Route
-        path="/helpdesk/solved"
-        element={
-          <RequireAdmin>
-            <ThemedLayout>
-              <TicketSolved />
-            </ThemedLayout>
-          </RequireAdmin>
-        }
-      />
-      <Route
-        path="/helpdesk/sharepoint"
-        element={
-          <RequireAdmin>
-            <ThemedLayout>
-              <DataSharepoint />
-            </ThemedLayout>
-          </RequireAdmin>
-        }
-      />
+      {/* ADMIN routes dengan layout */}
+      <Route path="/dashboard" element={
+        <AdminLayout>
+          <Dashboard />
+        </AdminLayout>
+      } />
+      <Route path="/devices" element={
+        <AdminLayout>
+          <Devices />
+        </AdminLayout>
+      } />
+      <Route path="/peripheral" element={
+        <AdminLayout>
+          <Peripheral />
+        </AdminLayout>
+      } />
+      <Route path="/licenses" element={
+        <AdminLayout>
+          <Licenses />
+        </AdminLayout>
+      } />
+      <Route path="/settings" element={
+        <AdminLayout>
+          <Settings />
+        </AdminLayout>
+      } />
+      <Route path="/charts/license" element={
+        <AdminLayout>
+          <ChartsLicense />
+        </AdminLayout>
+      } />
+      <Route path="/charts/peripheral" element={
+        <AdminLayout>
+          <ChartsPeripheral />
+        </AdminLayout>
+      } />
+      <Route path="/charts/device" element={
+        <AdminLayout>
+          <ChartsDevice />
+        </AdminLayout>
+      } />
+      <Route path="/charts/helpdesk" element={
+        <AdminLayout>
+          <ChartHelpdesk />
+        </AdminLayout>
+      } />
+      <Route path="/helpdesk/entry" element={
+        <AdminLayout>
+          <TicketEntry />
+        </AdminLayout>
+      } />
+      <Route path="/helpdesk/solved" element={
+        <AdminLayout>
+          <TicketSolved />
+        </AdminLayout>
+      } />
+      <Route path="/helpdesk/sharepoint" element={
+        <AdminLayout>
+          <DataSharepoint />
+        </AdminLayout>
+      } />
 
-      {/* Fallback */}
+      {/* Fallback untuk route yang tidak ditemukan */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

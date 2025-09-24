@@ -3,45 +3,46 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useMsal } from "@azure/msal-react";
 import { useNavigate, useLocation } from "react-router-dom";
 
-/* ===================== ENV (Vite/CRA) ===================== */
+/* ===================== KONFIGURASI ===================== */
+// Environment
 function readEnv(viteKey, craKey) {
   let vite = {};
   try { vite = (import.meta && import.meta.env) || {}; } catch {}
   const cra = (typeof process !== "undefined" && process.env) || {};
   return vite[viteKey] ?? cra[craKey] ?? "";
 }
-const RAW_API_BASE =
-  readEnv("VITE_API_BASE", "REACT_APP_API_BASE") || "http://localhost:4000";
+const RAW_API_BASE = readEnv("VITE_API_BASE", "REACT_APP_API_BASE") || "http://localhost:4000";
 const API_BASE = String(RAW_API_BASE).replace(/\/+$/, "");
 
-/* ===================== KONFIG SharePoint ===================== */
-const siteId =
-  "waskitainfra.sharepoint.com,32252c41-8aed-4ed2-ba35-b6e2731b0d4a,fb2ae80c-1283-4942-a3e8-0d47e8d004fb";
+// SharePoint
+const siteId = "waskitainfra.sharepoint.com,32252c41-8aed-4ed2-ba35-b6e2731b0d4a,fb2ae80c-1283-4942-a3e8-0d47e8d004fb";
 const TICKET_LIST_ID = "e4a152ba-ee6e-4e1d-9c74-04e8d32ea912";
 const REST_URL = "https://waskitainfra.sharepoint.com/sites/ITHELPDESK";
-
 const GRAPH_SCOPE = ["Sites.ReadWrite.All"];
 const SHAREPOINT_SCOPE = ["https://waskitainfra.sharepoint.com/.default"];
-
 const TICKET_LIST_NAME_FOR_ATTACH = "Tickets";
 const DONE_PHOTO_FIELD = "ScreenshotBuktiTicketsudahDilaku";
 const PROOF_IMAGES_FIELD = "Images";
 
-/* ===================== Divisi ===================== */
 const DIVISI_OPTIONS = [
-  "IT & System","Business Development","Direksi","Engineering","Finance & Accounting",
-  "Human Capital","Legal","Marketing & Sales","Operation & Maintenance",
-  "Procurement & Logistic","Project","QHSE","Sekper","Warehouse","Umum",
+  "IT & System", "Business Development", "Direksi", "Engineering", "Finance & Accounting",
+  "Human Capital", "Legal", "Marketing & Sales", "Operation & Maintenance",
+  "Procurement & Logistic", "Project", "QHSE", "Sekper", "Warehouse", "Umum",
 ];
 
-/* ===================== Utils ===================== */
-const esc = (v) => String(v ?? "").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");
-function fmtWaktu(s){
+/* ===================== UTILITIES ===================== */
+const esc = (v) => String(v ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+
+function fmtWaktu(s) {
   try {
-    return new Date(s).toLocaleString("id-ID",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit",second:"2-digit"});
+    return new Date(s).toLocaleString("id-ID", {
+      day: "2-digit", month: "2-digit", year: "numeric",
+      hour: "2-digit", minute: "2-digit", second: "2-digit"
+    });
   } catch { return s || "-"; }
 }
-function byNewest(a,b){
+
+function byNewest(a, b) {
   const fa = a.fields || a;
   const fb = b.fields || b;
   const aTime = Date.parse(fa.DateFinished || fa.Created || fa.DateReported || 0) || 0;
@@ -49,18 +50,16 @@ function byNewest(a,b){
   return bTime - aTime;
 }
 
-/* ===================== Mapping SharePoint ===================== */
-function pickFirst(...cands){
+function pickFirst(...cands) {
   for (const c of cands) if (c != null && c !== "") return c;
   return null;
 }
 
-/** Normalisasi People ke shape {displayName, email} walau datang sebagai string. */
 function toPerson(v) {
   if (!v) return null;
   if (typeof v === "string") {
     const email = v.includes("@") ? (v.match(/[^\s|;<>"]+@[^\s|;<>"]+/)?.[0] || "") : "";
-    const raw = v.split("|").pop() || v; // buang prefix claims i:0#.f|membership|
+    const raw = v.split("|").pop() || v;
     const nameFromEmail = email ? email.split("@")[0].replace(/[._]/g, " ") : raw;
     return { displayName: nameFromEmail, email };
   }
@@ -73,29 +72,20 @@ function toPerson(v) {
   return null;
 }
 
-function mapSpItem(item){
+function mapSpItem(item) {
   const f = item.fields || {};
-
-  // Debug: Lihat struktur lengkap item
+  
   console.log("=== DEBUG: Struktur Lengkap Item ===");
   console.log("Item:", item);
   console.log("Fields:", f);
   
-  // ===== User Requestor (People) - PERBAIKAN KHUSUS =====
+  // User Requestor
   let userReq = null;
-  
-  // Prioritaskan field-field yang mungkin berisi User Requestor
-  // TERBARU: Tambahkan createdBy berdasarkan struktur yang ditemukan
-  const fieldPriority = [
-    'UserRequestor', 'User_x0020_Requestor', 'RequestedBy', 
-    'Requestor', 'Pemohon', 'Author', 'CreatedBy'
-  ];
+  const fieldPriority = ['UserRequestor', 'User_x0020_Requestor', 'RequestedBy', 'Requestor', 'Pemohon', 'Author', 'CreatedBy'];
   
   for (const fieldName of fieldPriority) {
     if (f[fieldName]) {
       if (typeof f[fieldName] === 'object') {
-        // Jika berupa object (People field yang sudah di-expand)
-        // PERBAIKAN: Handle createdBy.user structure
         if (fieldName === 'CreatedBy' && f[fieldName].user) {
           userReq = {
             displayName: f[fieldName].user.displayName || '',
@@ -109,14 +99,13 @@ function mapSpItem(item){
         }
         if (userReq.displayName) break;
       } else if (typeof f[fieldName] === 'string') {
-        // Jika berupa string (LookupId atau email)
         userReq = toPerson(f[fieldName]);
         if (userReq.displayName) break;
       }
     }
   }
 
-  // ===== Pelaksana (People atau text) =====
+  // Pelaksana
   let assigned = null;
   const executorFields = ['Assignedto0', 'AssignedTo', 'Pelaksana', 'Executor'];
   
@@ -135,7 +124,6 @@ function mapSpItem(item){
     }
   }
 
-  // fallback kalau hanya text Issueloggedby
   const executor = assigned || (f.Issueloggedby ? { displayName: f.Issueloggedby, email: "" } : null);
 
   return {
@@ -148,8 +136,8 @@ function mapSpItem(item){
     Divisi: f.Divisi || "Umum",
     DateReported: f.DateReported || f.Created || "",
     DateFinished: f.DateFinished || "",
-    UserRequestor: userReq,     // People
-    Assignedto0: executor,      // People (or synthesized from Issueloggedby)
+    UserRequestor: userReq,
+    Assignedto0: executor,
     TipeTicket: f.TipeTicket || "",
     Issueloggedby: f.Issueloggedby || "",
     Author: toPerson(f.Author) || null,
@@ -158,9 +146,9 @@ function mapSpItem(item){
   };
 }
 
-function buildFieldsPayload(src){
+function buildFieldsPayload(src) {
   return {
-    Title: src.Title || (src.Description ? String(src.Description).slice(0,120) : `Ticket ${src.TicketNumber || ""}`),
+    Title: src.Title || (src.Description ? String(src.Description).slice(0, 120) : `Ticket ${src.TicketNumber || ""}`),
     TicketNumber: src.TicketNumber || "",
     Description: src.Description || "",
     Priority: src.Priority || "Normal",
@@ -174,220 +162,195 @@ function buildFieldsPayload(src){
   };
 }
 
-function spAttachmentUrl(itemId, fileName){
-  if(!itemId || !fileName) return "";
-  return `${REST_URL}/Lists/${TICKET_LIST_NAME_FOR_ATTACH}/Attachments/${itemId}/${encodeURIComponent(fileName)}`;
-}
-
-/* ===================== Component ===================== */
-export default function TicketSolved(){
+/* ===================== KOMPONEN UTAMA ===================== */
+export default function TicketSolved() {
   const { instance, accounts } = useMsal();
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Determine active tab from URL query parameter
   const queryParams = new URLSearchParams(location.search);
   const initialTab = queryParams.get('tab') || 'sp';
-  
-  // 'sp' = SharePoint, 'staging' = dari Ticket Entry (backend lokal)
   const [tab, setTab] = useState(initialTab);
 
-  // Update URL when tab changes
   useEffect(() => {
     const params = new URLSearchParams();
     params.set('tab', tab);
     navigate({ search: params.toString() }, { replace: true });
   }, [tab, navigate]);
 
-  // SharePoint state
+  // State SharePoint
   const [rowsSP, setRowsSP] = useState([]);
   const [loadingSP, setLoadingSP] = useState(false);
   const [notif, setNotif] = useState("");
   const [qSP, setQSP] = useState("");
-  const [filterSP, setFilterSP] = useState({ Divisi:"", Priority:"", Status:"" });
+  const [filterSP, setFilterSP] = useState({ Divisi: "", Priority: "", Status: "" });
   const [sel, setSel] = useState(null);
-  const [modal, setModal] = useState({ open:false, mode:"", data:{} });
+  const [modal, setModal] = useState({ open: false, mode: "", data: {} });
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState("");
   const fileInputRef = useRef(null);
 
-  // Staging state
+  // State Staging
   const [rowsST, setRowsST] = useState([]);
   const [loadingST, setLoadingST] = useState(false);
   const [qST, setQST] = useState("");
 
-  // Debug state
   const [debugData, setDebugData] = useState(null);
 
-  /* ====== Derived ====== */
+  /* ====== Derived Data ====== */
   const filteredSP = useMemo(() => {
     const s = qSP.trim().toLowerCase();
     return rowsSP
-      .filter((it)=>{
+      .filter((it) => {
         const f = it.fields;
-        if (filterSP.Status && (f.Status||"") !== filterSP.Status) return false;
-        if (filterSP.Divisi && (f.Divisi||"") !== filterSP.Divisi) return false;
-        if (filterSP.Priority && (f.Priority||"") !== filterSP.Priority) return false;
+        if (filterSP.Status && (f.Status || "") !== filterSP.Status) return false;
+        if (filterSP.Divisi && (f.Divisi || "") !== filterSP.Divisi) return false;
+        if (filterSP.Priority && (f.Priority || "") !== filterSP.Priority) return false;
         if (!s) return true;
         const reqName = f.UserRequestor?.displayName || "";
         const exeName = (f.Assignedto0?.displayName) || f.Issueloggedby || "";
         return [
-          f.TicketNumber,f.Title,f.Description,f.Divisi,f.Priority,f.Status,
+          f.TicketNumber, f.Title, f.Description, f.Divisi, f.Priority, f.Status,
           f.TipeTicket, exeName, reqName, f.Author?.displayName, f.Author?.email,
-          it.id,it.fields?.spId
+          it.id, it.fields?.spId
         ].join(" ").toLowerCase().includes(s);
       })
       .sort(byNewest);
-  }, [rowsSP,qSP,filterSP]);
+  }, [rowsSP, qSP, filterSP]);
 
-  const filteredST = useMemo(()=>{
+  const filteredST = useMemo(() => {
     const s = qST.trim().toLowerCase();
     return rowsST
-      .filter(r=>{
+      .filter(r => {
         if (!s) return true;
         return [
           r.ticketNo, r.userRequestor, r.pelaksana, r.divisi, r.prioritas, r.deskripsi,
           r.status, r.email
         ].join(" ").toLowerCase().includes(s);
       })
-      .sort((a,b)=>{
+      .sort((a, b) => {
         const tA = Date.parse(a.DateFinished || a.Created || a.waktu || 0) || 0;
         const tB = Date.parse(b.DateFinished || b.Created || b.waktu || 0) || 0;
         return tB - tA;
       });
-  }, [rowsST,qST]);
+  }, [rowsST, qST]);
 
   /* ====== Effects ====== */
-  useEffect(()=>{
-    if (tab==="sp") fetchFromSP();
-    if (tab==="staging") loadStaging();
+  useEffect(() => {
+    if (tab === "sp") fetchFromSP();
+    if (tab === "staging") loadStaging();
   }, [tab]);
 
-  /* ===================== SHAREPOINT: FETCH ===================== */
-  async function fetchFromSP(){
+  /* ===================== SHAREPOINT API ===================== */
+  async function fetchFromSP() {
     setLoadingSP(true);
-    try{
+    try {
       const account = accounts?.[0];
-      if(!account) throw new Error("Belum login MSAL");
+      if (!account) throw new Error("Belum login MSAL");
       const tok = await instance.acquireTokenSilent({ scopes: GRAPH_SCOPE, account });
 
-      // PERBAIKAN: Query yang lebih komprehensif untuk field People
-      // Gunakan $expand dengan select yang spesifik untuk field People
-      const url =
-        `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${TICKET_LIST_ID}/items` +
+      const url = `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${TICKET_LIST_ID}/items` +
         `?$expand=fields($select=id,Title,TicketNumber,Description,Priority,Status,Divisi,DateReported,DateFinished,TipeTicket,Issueloggedby,${DONE_PHOTO_FIELD},Attachments,UserRequestor,User_x0020_Requestor,Assignedto0,AssignedTo,Pelaksana,Author)` +
         `&$top=2000`;
 
       const res = await fetch(url, {
-        headers:{
+        headers: {
           Authorization: `Bearer ${tok.accessToken}`,
           Prefer: "HonorNonIndexedQueriesWarningMayFailRandomly=true",
         }
       });
       const j = await res.json();
-      if(!res.ok){
-        const msg = j?.error?.message || JSON.stringify(j).slice(0,200);
-        throw new Error(msg);
-      }
+      if (!res.ok) throw new Error(j?.error?.message || JSON.stringify(j).slice(0, 200));
       
-      // Debug: Lihat struktur data yang diterima
-      console.log("Data dari SharePoint (struktur lengkap):", j.value);
+      console.log("Data dari SharePoint:", j.value);
       setDebugData(j.value && j.value.length > 0 ? j.value[0] : j);
       
-      const items = (j.value||[]).map((v)=>({ id:v.id, fields: mapSpItem(v) })).sort(byNewest);
+      const items = (j.value || []).map((v) => ({ id: v.id, fields: mapSpItem(v) })).sort(byNewest);
       setRowsSP(items);
       setSel(null);
-    }catch(e){
+    } catch (e) {
       console.error(e);
       setNotif("Gagal mengambil data SharePoint: " + (e?.message || e));
       setRowsSP([]);
-    }finally{
+    } finally {
       setLoadingSP(false);
     }
   }
 
-  // Alternatif: Fetch Data Langsung dari REST API SharePoint
-  async function fetchFromSPRestAPI(){
+  async function fetchFromSPRestAPI() {
     setLoadingSP(true);
-    try{
+    try {
       const account = accounts?.[0];
-      if(!account) throw new Error("Belum login MSAL");
+      if (!account) throw new Error("Belum login MSAL");
       const spTok = await instance.acquireTokenSilent({ scopes: SHAREPOINT_SCOPE, account });
 
-      // Gunakan REST API SharePoint langsung
       const url = `${REST_URL}/_api/web/lists(guid'${TICKET_LIST_ID}')/items` +
         `?$select=ID,Title,TicketNumber,Description,Priority,Status,Divisi,DateReported,DateFinished,TipeTicket,Issueloggedby,${DONE_PHOTO_FIELD},UserRequestor/Title,UserRequestor/EMail,User_x0020_Requestor/Title,User_x0020_Requestor/EMail,Assignedto0/Title,Assignedto0/EMail,Author/Title,Author/EMail` +
         `&$expand=UserRequestor,User_x0020_Requestor,Assignedto0,Author` +
         `&$top=2000`;
 
       const res = await fetch(url, {
-        headers:{
+        headers: {
           Authorization: `Bearer ${spTok.accessToken}`,
           Accept: "application/json;odata=verbose",
         }
       });
       
-      if(!res.ok){
-        const msg = await res.text();
-        throw new Error(msg);
-      }
+      if (!res.ok) throw new Error(await res.text());
       
       const j = await res.json();
       console.log("Data dari REST API SharePoint:", j);
       setDebugData(j.d && j.d.results && j.d.results.length > 0 ? j.d.results[0] : j);
       
-      // Mapping data dari REST API response
-      const items = (j.d?.results || []).map(item => {
-        return {
-          id: item.ID,
-          fields: {
-            spId: item.ID,
-            Title: item.Title || "",
-            TicketNumber: item.TicketNumber || item.ID,
-            Description: item.Description || "",
-            Priority: item.Priority || "Normal",
-            Status: item.Status || "",
-            Divisi: item.Divisi || "Umum",
-            DateReported: item.DateReported || item.Created || "",
-            DateFinished: item.DateFinished || "",
-            UserRequestor: item.UserRequestor ? { 
-              displayName: item.UserRequestor.Title, 
-              email: item.UserRequestor.EMail 
-            } : (item.User_x0020_Requestor ? { 
-              displayName: item.User_x0020_Requestor.Title, 
-              email: item.User_x0020_Requestor.EMail 
-            } : null),
-            Assignedto0: item.Assignedto0 ? { 
-              displayName: item.Assignedto0.Title, 
-              email: item.Assignedto0.EMail 
-            } : (item.Issueloggedby ? { 
-              displayName: item.Issueloggedby, 
-              email: "" 
-            } : null),
-            TipeTicket: item.TipeTicket || "",
-            Issueloggedby: item.Issueloggedby || "",
-            Author: item.Author ? { 
-              displayName: item.Author.Title, 
-              email: item.Author.EMail 
-            } : null,
-            [DONE_PHOTO_FIELD]: item[DONE_PHOTO_FIELD] || "",
-            HasAttachments: !!item.Attachments,
-          }
-        };
-      }).sort(byNewest);
+      const items = (j.d?.results || []).map(item => ({
+        id: item.ID,
+        fields: {
+          spId: item.ID,
+          Title: item.Title || "",
+          TicketNumber: item.TicketNumber || item.ID,
+          Description: item.Description || "",
+          Priority: item.Priority || "Normal",
+          Status: item.Status || "",
+          Divisi: item.Divisi || "Umum",
+          DateReported: item.DateReported || item.Created || "",
+          DateFinished: item.DateFinished || "",
+          UserRequestor: item.UserRequestor ? {
+            displayName: item.UserRequestor.Title,
+            email: item.UserRequestor.EMail
+          } : (item.User_x0020_Requestor ? {
+            displayName: item.User_x0020_Requestor.Title,
+            email: item.User_x0020_Requestor.EMail
+          } : null),
+          Assignedto0: item.Assignedto0 ? {
+            displayName: item.Assignedto0.Title,
+            email: item.Assignedto0.EMail
+          } : (item.Issueloggedby ? {
+            displayName: item.Issueloggedby,
+            email: ""
+          } : null),
+          TipeTicket: item.TipeTicket || "",
+          Issueloggedby: item.Issueloggedby || "",
+          Author: item.Author ? {
+            displayName: item.Author.Title,
+            email: item.Author.EMail
+          } : null,
+          [DONE_PHOTO_FIELD]: item[DONE_PHOTO_FIELD] || "",
+          HasAttachments: !!item.Attachments,
+        }
+      })).sort(byNewest);
       
       setRowsSP(items);
       setSel(null);
-    }catch(e){
+    } catch (e) {
       console.error(e);
       setNotif("Gagal mengambil data SharePoint: " + (e?.message || e));
       setRowsSP([]);
-    }finally{
+    } finally {
       setLoadingSP(false);
     }
   }
 
-  /* ===================== STAGING: FETCH ===================== */
+  /* ===================== STAGING API ===================== */
   function isCrossOrigin(u) {
     try {
       const Url = new URL(u, window.location.origin);
@@ -396,25 +359,23 @@ export default function TicketSolved(){
       return false;
     }
   }
-  async function tryGetJson(url){
-    const opts = { headers:{}, credentials: isCrossOrigin(url) ? "omit" : "include" };
+
+  async function tryGetJson(url) {
+    const opts = { headers: {}, credentials: isCrossOrigin(url) ? "omit" : "include" };
     const r = await fetch(url, opts);
     const ct = r.headers.get("content-type") || "";
-    if(!r.ok){
-      console.warn(`try url fail: ${url} HTTP ${r.status} @ ${url}`);
-      throw new Error(`HTTP ${r.status} @ ${url}`);
-    }
-    if(!ct.includes("application/json")){
-      const text = await r.text().catch(()=> "");
-      const head = text.slice(0,160).replace(/\s+/g," ");
+    if (!r.ok) throw new Error(`HTTP ${r.status} @ ${url}`);
+    if (!ct.includes("application/json")) {
+      const text = await r.text().catch(() => "");
+      const head = text.slice(0, 160).replace(/\s+/g, " ");
       throw new Error(`Non-JSON (${r.status}) @ ${url}: ${head}`);
     }
     return await r.json();
   }
 
-  async function loadStaging(){
+  async function loadStaging() {
     setLoadingST(true);
-    try{
+    try {
       const candidates = [
         `${API_BASE}/api/tickets?status=Selesai`,
         `${API_BASE}/api/tickets`,
@@ -424,15 +385,15 @@ export default function TicketSolved(){
         "/tickets",
       ];
       let payload = null;
-      for (const u of candidates){
+      for (const u of candidates) {
         try {
           payload = await tryGetJson(u);
           if (payload && (Array.isArray(payload.rows) || Array.isArray(payload))) break;
-        } catch {}
+        } catch { }
       }
-      if(!payload){
+      if (!payload) {
         const demo = localStorage.getItem("helpdesk_demo_tickets_solved");
-        if(demo){
+        if (demo) {
           setRowsST(JSON.parse(demo));
           setLoadingST(false);
           return;
@@ -453,66 +414,69 @@ export default function TicketSolved(){
         };
       }
       const arr = Array.isArray(payload) ? payload : payload.rows || [];
-      const normalized = arr.map(normalizeStagingRow).sort((a,b)=>{
+      const normalized = arr.map(normalizeStagingRow).sort((a, b) => {
         const tA = Date.parse(a.DateFinished || a.Created || a.waktu || 0) || 0;
         const tB = Date.parse(b.DateFinished || b.Created || b.waktu || 0) || 0;
         return tB - tA;
       });
       setRowsST(normalized);
       localStorage.setItem("helpdesk_demo_tickets_solved", JSON.stringify(normalized));
-    }catch(e){
+    } catch (e) {
       console.error(e);
       setRowsST([]);
-    }finally{
+    } finally {
       setLoadingST(false);
     }
   }
 
-  /* ===================== CRUD (SharePoint) ===================== */
-  function openCreate(){
+  /* ===================== CRUD OPERATIONS ===================== */
+  function openCreate() {
     resetPhoto();
     setModal({
-      open:true, mode:"create",
-      data:{
-        Title:"", TicketNumber:"", Description:"",
-        Priority:"Normal", Status:"Selesai", Divisi:"Umum",
-        DateReported:new Date().toISOString(),
-        DateFinished:new Date().toISOString(),
-        TipeTicket:"", Assignedto0:"", Issueloggedby:"",
+      open: true, mode: "create",
+      data: {
+        Title: "", TicketNumber: "", Description: "",
+        Priority: "Normal", Status: "Selesai", Divisi: "Umum",
+        DateReported: new Date().toISOString(),
+        DateFinished: new Date().toISOString(),
+        TipeTicket: "", Assignedto0: "", Issueloggedby: "",
       }
     });
   }
-  function openEdit(){
-    if(!sel) return;
+
+  function openEdit() {
+    if (!sel) return;
     resetPhoto();
-    setModal({ open:true, mode:"edit", data:{ ...sel.fields, spId: sel.id } });
+    setModal({ open: true, mode: "edit", data: { ...sel.fields, spId: sel.id } });
   }
-  async function handleDelete(){
-    if(!sel) return;
-    if(!window.confirm(`Hapus Ticket #${sel.fields.TicketNumber || sel.id}?`)) return;
+
+  async function handleDelete() {
+    if (!sel) return;
+    if (!window.confirm(`Hapus Ticket #${sel.fields.TicketNumber || sel.id}?`)) return;
     setLoadingSP(true);
-    try{
+    try {
       const account = accounts?.[0];
       const tok = await instance.acquireTokenSilent({ scopes: GRAPH_SCOPE, account });
       const res = await fetch(
         `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${TICKET_LIST_ID}/items/${sel.id}`,
-        { method:"DELETE", headers:{ Authorization:`Bearer ${tok.accessToken}` } }
+        { method: "DELETE", headers: { Authorization: `Bearer ${tok.accessToken}` } }
       );
-      if(!res.ok) throw new Error(await res.text());
+      if (!res.ok) throw new Error(await res.text());
       setNotif("Data berhasil dihapus.");
       await fetchFromSP();
-    }catch(e){
+    } catch (e) {
       console.error(e);
       setNotif("Gagal menghapus: " + (e?.message || e));
-    }finally{
+    } finally {
       setLoadingSP(false);
     }
   }
-  async function doCreateOrEdit(e){
+
+  async function doCreateOrEdit(e) {
     e.preventDefault();
-    if(loadingSP) return;
+    if (loadingSP) return;
     setLoadingSP(true);
-    try{
+    try {
       const account = accounts?.[0];
       const gTok = await instance.acquireTokenSilent({ scopes: GRAPH_SCOPE, account });
 
@@ -527,60 +491,62 @@ export default function TicketSolved(){
       });
 
       let itemId = null;
-      if (modal.mode === "create"){
+      if (modal.mode === "create") {
         const res = await fetch(
           `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${TICKET_LIST_ID}/items`,
-          { method:"POST", headers:{ Authorization:`Bearer ${gTok.accessToken}`, "Content-Type":"application/json" }, body: JSON.stringify({ fields }) }
+          { method: "POST", headers: { Authorization: `Bearer ${gTok.accessToken}`, "Content-Type": "application/json" }, body: JSON.stringify({ fields }) }
         );
-        if(!res.ok) throw new Error(await res.text());
+        if (!res.ok) throw new Error(await res.text());
         const created = await res.json();
         itemId = created?.id;
       } else {
         itemId = sel?.id;
-        if(!itemId) throw new Error("Tidak ada item terpilih.");
+        if (!itemId) throw new Error("Tidak ada item terpilih.");
         const res = await fetch(
           `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${TICKET_LIST_ID}/items/${itemId}/fields`,
-          { method:"PATCH", headers:{ Authorization:`Bearer ${gTok.accessToken}`, "Content-Type":"application/json" }, body: JSON.stringify(fields) }
+          { method: "PATCH", headers: { Authorization: `Bearer ${gTok.accessToken}`, "Content-Type": "application/json" }, body: JSON.stringify(fields) }
         );
-        if(!res.ok) throw new Error(await res.text());
+        if (!res.ok) throw new Error(await res.text());
       }
 
-      if(itemId && photoFile){
+      if (itemId && photoFile) {
         const saved = await uploadAttachmentToSP(instance, accounts, itemId, photoFile);
         await setDonePhotoMetaOnSP(instance, accounts, itemId, saved.fileName);
       }
 
-      setNotif(modal.mode==="create" ? "Berhasil menambahkan data." : "Perubahan tersimpan.");
-      setModal({ open:false, mode:"", data:{} });
+      setNotif(modal.mode === "create" ? "Berhasil menambahkan data." : "Perubahan tersimpan.");
+      setModal({ open: false, mode: "", data: {} });
       resetPhoto();
       await fetchFromSP();
-    }catch(e){
+    } catch (e) {
       console.error(e);
       setNotif("Gagal simpan: " + (e?.message || e));
-    }finally{
+    } finally {
       setLoadingSP(false);
     }
   }
 
-  /* ===================== FOTO HELPERS ===================== */
-  function onPickPhoto(e){
+  /* ===================== PHOTO HANDLING ===================== */
+  function onPickPhoto(e) {
     const f = e.target.files?.[0];
-    if(f){
+    if (f) {
       setPhotoFile(f);
       const url = URL.createObjectURL(f);
       setPhotoPreview(url);
     }
   }
-  function removePhoto(){
-    setPhotoFile(null);
-    if(photoPreview) URL.revokeObjectURL(photoPreview);
-    setPhotoPreview("");
-    if(fileInputRef.current) fileInputRef.current.value = "";
-  }
-  function resetPhoto(){ removePhoto(); }
 
-  /* ===================== PRINT ===================== */
-  function handlePrintSP(){
+  function removePhoto() {
+    setPhotoFile(null);
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
+    setPhotoPreview("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function resetPhoto() { removePhoto(); }
+
+  /* ===================== PRINT FUNCTIONS ===================== */
+  function handlePrintSP() {
     const items = filteredSP;
     const head = `
       <meta charset="utf-8"/>
@@ -590,12 +556,11 @@ export default function TicketSolved(){
         body { font: 12px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; color:#000; }
         h1 { margin:0 0 8px; font-size:18px; }
         table { width:100%; border-collapse:collapse; border:1.5pt solid #000; }
-        th,td { border:0.9pt solid
-                th,td { border:0.9pt solid #000; padding:6px 8px; vertical-align:top; }
+        th,td { border:0.9pt solid #000; padding:6px 8px; vertical-align:top; }
         thead th { background:#f3f4f6; text-align:left; }
       </style>
     `;
-    const body = items.map(it=>{
+    const body = items.map(it => {
       const f = it.fields;
       const req = f.UserRequestor?.displayName || "";
       const exe = (f.Assignedto0?.displayName) || f.Issueloggedby || "";
@@ -625,7 +590,7 @@ export default function TicketSolved(){
     w.document.open(); w.document.write(html); w.document.close();
   }
 
-  function handlePrintST(){
+  function handlePrintST() {
     const items = filteredST;
     const head = `
       <meta charset="utf-8"/>
@@ -639,7 +604,7 @@ export default function TicketSolved(){
         thead th { background:#f3f4f6; text-align:left; }
       </style>
     `;
-    const body = items.map(r=>`
+    const body = items.map(r => `
       <tr>
         <td>${esc(r.ticketNo || r.TicketNumber || "")}</td>
         <td>${esc(fmtWaktu(r.Created || r.waktu))}</td>
@@ -669,7 +634,7 @@ export default function TicketSolved(){
   return (
     <div className="relative min-h-screen flex flex-col items-center py-4 bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white">
       {notif && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-emerald-600 text-white px-6 py-3 rounded shadow-md font-bold" onClick={()=>setNotif("")}>
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-emerald-600 text-white px-6 py-3 rounded shadow-md font-bold" onClick={() => setNotif("")}>
           {notif}
         </div>
       )}
@@ -679,32 +644,48 @@ export default function TicketSolved(){
         <div className="mb-3">
           <h2 className="text-3xl font-bold mb-1 text-[#215ba6] dark:text-blue-400">Data Sharepoint</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            {tab === "sp" 
-              ? "Data SharePoint List: TICKETS" 
+            {tab === "sp"
+              ? "Data SharePoint List: TICKETS"
               : "Sumber data: " + API_BASE + "/api/tickets?status=Selesai"}
           </p>
         </div>
 
+        {/* Tab Navigation */}
+        <div className="flex mb-4 border-b border-gray-200 dark:border-gray-700">
+          <button
+            className={`px-4 py-2 font-medium ${tab === "sp" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500"}`}
+            onClick={() => setTab("sp")}
+          >
+            SharePoint
+          </button>
+          <button
+            className={`px-4 py-2 font-medium ${tab === "staging" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500"}`}
+            onClick={() => setTab("staging")}
+          >
+            Staging
+          </button>
+        </div>
+
         {/* ===== SharePoint Tab ===== */}
-        {tab==="sp" && (
+        {tab === "sp" && (
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-xl">
             <div className="flex flex-wrap justify-between items-start gap-3 mb-4">
               <div className="flex flex-wrap items-center gap-2">
-                <input value={qSP} onChange={(e)=>setQSP(e.target.value)} placeholder="Cari…"
-                       className="px-3 py-2 rounded border border-gray-300 dark:bg-gray-700 dark:text-white dark:border-gray-600 w-64"/>
+                <input value={qSP} onChange={(e) => setQSP(e.target.value)} placeholder="Cari…"
+                  className="px-3 py-2 rounded border border-gray-300 dark:bg-gray-700 dark:text-white dark:border-gray-600 w-64" />
                 <select className="px-3 py-2 rounded border border-gray-300 dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                        value={filterSP.Divisi} onChange={(e)=>setFilterSP(f=>({...f,Divisi:e.target.value}))}>
+                  value={filterSP.Divisi} onChange={(e) => setFilterSP(f => ({ ...f, Divisi: e.target.value }))}>
                   <option value="">All Divisi</option>
-                  {DIVISI_OPTIONS.map(d=><option key={d} value={d}>{d}</option>)}
+                  {DIVISI_OPTIONS.map(d => <option key={d} value={d}>{d}</option>)}
                 </select>
                 <select className="px-3 py-2 rounded border border-gray-300 dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                        value={filterSP.Priority} onChange={(e)=>setFilterSP(f=>({...f,Priority:e.target.value}))}>
+                  value={filterSP.Priority} onChange={(e) => setFilterSP(f => ({ ...f, Priority: e.target.value }))}>
                   <option value="">All Prioritas</option>
-                  {["Low","Normal","High"].map(p=><option key={p} value={p}>{p}</option>)}
+                  {["Low", "Normal", "High"].map(p => <option key={p} value={p}>{p}</option>)}
                 </select>
                 <select className="px-3 py-2 rounded border border-gray-300 dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                        value={filterSP.Status} onChange={(e)=>setFilterSP(f=>({...f,Status:e.target.value}))}>
-                  {["","Belum","Selesai","Pending"].map(s=><option key={s||"all"} value={s}>{s || "All Status"}</option>)}
+                  value={filterSP.Status} onChange={(e) => setFilterSP(f => ({ ...f, Status: e.target.value }))}>
+                  {["", "Belum", "Selesai", "Pending"].map(s => <option key={s || "all"} value={s}>{s || "All Status"}</option>)}
                 </select>
                 <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded" onClick={fetchFromSP} disabled={loadingSP}>
                   {loadingSP ? "Loading..." : "Reload"}
@@ -744,9 +725,9 @@ export default function TicketSolved(){
                   ) : filteredSP.length === 0 ? (
                     <tr><td colSpan={10} className="px-5 py-10 text-center text-gray-400">Tidak ada data.</td></tr>
                   ) : (
-                    filteredSP.map((it,i)=>(
-                      <RowSP key={it.id} r={it} zebra={i%2===1} onSelect={()=>setSel(it)}
-                             selected={sel?.id===it.id} msal={{ instance, accounts }}/>
+                    filteredSP.map((it, i) => (
+                      <RowSP key={it.id} r={it} zebra={i % 2 === 1} onSelect={() => setSel(it)}
+                        selected={sel?.id === it.id} msal={{ instance, accounts }} />
                     ))
                   )}
                 </tbody>
@@ -756,12 +737,12 @@ export default function TicketSolved(){
         )}
 
         {/* ===== Staging Tab ===== */}
-        {tab==="staging" && (
+        {tab === "staging" && (
           <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-xl">
             <div className="flex flex-wrap justify-between items-start gap-3 mb-4">
               <div className="flex flex-wrap items-center gap-2">
-                <input value={qST} onChange={(e)=>setQST(e.target.value)} placeholder="Cari…"
-                       className="px-3 py-2 rounded border border-gray-300 dark:bg-gray-700 dark:text-white dark:border-gray-600 w-64"/>
+                <input value={qST} onChange={(e) => setQST(e.target.value)} placeholder="Cari…"
+                  className="px-3 py-2 rounded border border-gray-300 dark:bg-gray-700 dark:text-white dark:border-gray-600 w-64" />
                 <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded" onClick={loadStaging} disabled={loadingST}>
                   {loadingST ? "Loading..." : "Reload"}
                 </button>
@@ -793,7 +774,7 @@ export default function TicketSolved(){
                   ) : filteredST.length === 0 ? (
                     <tr><td colSpan={10} className="px-5 py-10 text-center text-gray-400">Tidak ada data.</td></tr>
                   ) : (
-                    filteredST.map((r,i)=> <RowST key={r.id || r.ticketNo || i} r={r} zebra={i%2===1} />)
+                    filteredST.map((r, i) => <RowST key={r.id || r.ticketNo || i} r={r} zebra={i % 2 === 1} />)
                   )}
                 </tbody>
               </table>
@@ -803,11 +784,11 @@ export default function TicketSolved(){
       </div>
 
       {/* Modal Create/Edit (SharePoint) */}
-      {modal.open && tab==="sp" && (
+      {modal.open && tab === "sp" && (
         <FormModal
           mode={modal.mode}
           data={modal.data}
-          onClose={()=>{ setModal({open:false,mode:"",data:{}}); resetPhoto(); }}
+          onClose={() => { setModal({ open: false, mode: "", data: {} }); resetPhoto(); }}
           onSubmit={doCreateOrEdit}
           onPickPhoto={onPickPhoto}
           onRemovePhoto={removePhoto}
@@ -822,7 +803,7 @@ export default function TicketSolved(){
   );
 }
 
-/* ===================== Sub Komponen ===================== */
+/* ===================== SUB KOMPONEN ===================== */
 function Th({ children, className = "" }) {
   return <th className={`px-5 py-4 font-semibold text-xs uppercase tracking-wide ${className}`}>{children}</th>;
 }
@@ -836,7 +817,7 @@ function Avatar({ name = "" }) {
     const parts = String(name || "").trim().split(/\s+/);
     return (parts[0]?.[0] || "?") + (parts[1]?.[0] || "");
   }, [name]);
-  
+
   return (
     <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 text-white flex items-center justify-center text-sm font-semibold shadow">
       {String(init).toUpperCase()}
@@ -858,9 +839,9 @@ function PriorityChip({ value = "" }) {
     v.includes("high") || v.includes("tinggi")
       ? "bg-red-100 dark:bg-red-800 text-red-800 dark:text-red-100 border-red-200 dark:border-red-700"
       : v.includes("low") || v.includes("rendah")
-      ? "bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-100 border-green-200 dark:border-green-700"
-      : "bg-yellow-100 dark:bg-yellow-800 text-yellow-800 dark:text-yellow-100 border-yellow-200 dark:border-yellow-700";
-  
+        ? "bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-100 border-green-200 dark:border-green-700"
+        : "bg-yellow-100 dark:bg-yellow-800 text-yellow-800 dark:text-yellow-100 border-yellow-200 dark:border-yellow-700";
+
   return (
     <span className={`inline-flex px-2 py-0.5 rounded border text-xs ${style}`}>
       {value || "-"}
@@ -874,9 +855,9 @@ function StatusBadge({ value = "" }) {
     v === "selesai"
       ? "bg-emerald-100 dark:bg-emerald-800 text-emerald-800 dark:text-emerald-100 border-emerald-200 dark:border-emerald-700"
       : v === "belum"
-      ? "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600"
-      : "bg-yellow-100 dark:bg-yellow-800 text-yellow-800 dark:text-yellow-100 border-yellow-200 dark:border-yellow-700";
-  
+        ? "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600"
+        : "bg-yellow-100 dark:bg-yellow-800 text-yellow-800 dark:text-yellow-100 border-yellow-200 dark:border-yellow-700";
+
   return (
     <span className={`inline-flex px-2 py-0.5 rounded border text-xs ${style}`}>
       {value || "-"}
@@ -889,7 +870,6 @@ function RowSP({ r, zebra, onSelect, selected, msal }) {
   const f = r.fields;
   const reqName = f.UserRequestor?.displayName || "-";
   const reqEmail = f.UserRequestor?.email || "";
-
   const exeName = f.Assignedto0?.displayName || f.Issueloggedby || "-";
   const exeEmail = f.Assignedto0?.email || "";
 
@@ -900,15 +880,14 @@ function RowSP({ r, zebra, onSelect, selected, msal }) {
         selected
           ? "bg-purple-200 dark:bg-purple-800 font-bold"
           : zebra
-          ? "bg-blue-50/60 dark:bg-blue-900/60"
-          : ""
+            ? "bg-blue-50/60 dark:bg-blue-900/60"
+            : ""
       } hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors`}
     >
       <Td>{f.TicketNumber || r.id}</Td>
       <Td>{fmtWaktu(f.DateReported)}</Td>
       <Td>{fmtWaktu(f.DateFinished)}</Td>
 
-      {/* User Requestor */}
       <Td>
         <div className="flex items-center gap-3">
           <Avatar name={reqName} />
@@ -919,7 +898,6 @@ function RowSP({ r, zebra, onSelect, selected, msal }) {
         </div>
       </Td>
 
-      {/* Pelaksana */}
       <Td>
         <div className="flex items-center gap-3">
           <Avatar name={exeName} />
@@ -930,18 +908,10 @@ function RowSP({ r, zebra, onSelect, selected, msal }) {
         </div>
       </Td>
 
-      <Td>
-        <Chip>{f.Divisi || "-"}</Chip>
-      </Td>
-      <Td>
-        <PriorityChip value={f.Priority} />
-      </Td>
-      <Td>
-        <StatusBadge value={f.Status} />
-      </Td>
-      <Td>
-        <div className="max-w-[560px] whitespace-pre-wrap">{f.Description || "-"}</div>
-      </Td>
+      <Td><Chip>{f.Divisi || "-"}</Chip></Td>
+      <Td><PriorityChip value={f.Priority} /></Td>
+      <Td><StatusBadge value={f.Status} /></Td>
+      <Td><div className="max-w-[560px] whitespace-pre-wrap">{f.Description || "-"}</div></Td>
       <Td>
         {f[DONE_PHOTO_FIELD] ? (
           <button
@@ -969,7 +939,6 @@ function RowST({ r, zebra }) {
       <Td>{fmtWaktu(r.Created || r.waktu)}</Td>
       <Td>{fmtWaktu(r.DateFinished || "")}</Td>
 
-      {/* User Requestor */}
       <Td>
         <div className="flex items-center gap-3">
           <Avatar name={r.userRequestor || r.Title || ""} />
@@ -980,7 +949,6 @@ function RowST({ r, zebra }) {
         </div>
       </Td>
 
-      {/* Pelaksana */}
       <Td>
         <div className="flex items-center gap-3">
           <Avatar name={r.pelaksana || ""} />
@@ -990,18 +958,10 @@ function RowST({ r, zebra }) {
         </div>
       </Td>
 
-      <Td>
-        <Chip>{r.divisi || r.Division || "-"}</Chip>
-      </Td>
-      <Td>
-        <PriorityChip value={r.prioritas || r.Priority} />
-      </Td>
-      <Td>
-        <StatusBadge value={r.status || r.Status || ""} />
-      </Td>
-      <Td>
-        <div className="max-w-[560px] whitespace-pre-wrap">{r.deskripsi || r.Description || "-"}</div>
-      </Td>
+      <Td><Chip>{r.divisi || r.Division || "-"}</Chip></Td>
+      <Td><PriorityChip value={r.prioritas || r.Priority} /></Td>
+      <Td><StatusBadge value={r.status || r.Status || ""} /></Td>
+      <Td><div className="max-w-[560px] whitespace-pre-wrap">{r.deskripsi || r.Description || "-"}</div></Td>
       <Td>
         {r.PhotoUrl ? (
           <a
@@ -1020,21 +980,15 @@ function RowST({ r, zebra }) {
   );
 }
 
-/* ===================== Modal Form (SharePoint) ===================== */
+/* ===================== MODAL FORM ===================== */
 function FormModal({ mode, data, onClose, onSubmit, onPickPhoto, onRemovePhoto, photoPreview, fileInputRef }) {
   return (
     <div className="fixed inset-0 z-50">
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div
-        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 text-gray-900 dark:text-white w-[720px] max-w-[92vw] rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700"
-      >
-        <div
-          className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between"
-        >
+      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 text-gray-900 dark:text-white w-[720px] max-w-[92vw] rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700">
+        <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
           <div className="font-semibold">{mode === "edit" ? "Edit" : "Tambah"} Ticket</div>
-          <button onClick={onClose} className="text-sm text-gray-500 hover:underline">
-            tutup
-          </button>
+          <button onClick={onClose} className="text-sm text-gray-500 hover:underline">tutup</button>
         </div>
 
         <form onSubmit={onSubmit} className="px-5 py-4 space-y-4">
@@ -1064,9 +1018,7 @@ function FormModal({ mode, data, onClose, onSubmit, onPickPhoto, onRemovePhoto, 
                 className="border rounded w-full px-3 py-2 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
               >
                 {DIVISI_OPTIONS.map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
+                  <option key={d} value={d}>{d}</option>
                 ))}
               </select>
             </div>
@@ -1078,9 +1030,7 @@ function FormModal({ mode, data, onClose, onSubmit, onPickPhoto, onRemovePhoto, 
                 className="border rounded w-full px-3 py-2 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
               >
                 {["Low", "Normal", "High"].map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
+                  <option key={p} value={p}>{p}</option>
                 ))}
               </select>
             </div>
@@ -1093,9 +1043,7 @@ function FormModal({ mode, data, onClose, onSubmit, onPickPhoto, onRemovePhoto, 
                 className="border rounded w-full px-3 py-2 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
               >
                 {["Belum", "Pending", "Selesai"].map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
+                  <option key={s} value={s}>{s}</option>
                 ))}
               </select>
             </div>
@@ -1168,9 +1116,7 @@ function FormModal({ mode, data, onClose, onSubmit, onPickPhoto, onRemovePhoto, 
             {photoPreview ? (
               <div className="mt-3 flex items-center gap-3">
                 <img src={photoPreview} alt="preview" className="h-20 w-20 object-cover rounded-lg border" />
-                <button type="button" onClick={onRemovePhoto} className="text-red-600 hover:underline">
-                  Hapus foto
-                </button>
+                <button type="button" onClick={onRemovePhoto} className="text-red-600 hover:underline">Hapus foto</button>
               </div>
             ) : data?.[DONE_PHOTO_FIELD] ? (
               <OldPhotoPreview metaName={data[DONE_PHOTO_FIELD]} itemId={data.spId} />
@@ -1178,16 +1124,8 @@ function FormModal({ mode, data, onClose, onSubmit, onPickPhoto, onRemovePhoto, 
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
-            <button
-              type="button"
-              className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-700 dark:text-white"
-              onClick={onClose}
-            >
-              Batal
-            </button>
-            <button type="submit" className="px-5 py-2 rounded bg-blue-600 text-white font-bold">
-              Simpan
-            </button>
+            <button type="button" className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-700 dark:text-white" onClick={onClose}>Batal</button>
+            <button type="submit" className="px-5 py-2 rounded bg-blue-600 text-white font-bold">Simpan</button>
           </div>
         </form>
       </div>
@@ -1195,7 +1133,7 @@ function FormModal({ mode, data, onClose, onSubmit, onPickPhoto, onRemovePhoto, 
   );
 }
 
-/* ===================== Attachment Helpers (SP) ===================== */
+/* ===================== ATTACHMENT HELPERS ===================== */
 async function uploadAttachmentToSP(instance, accounts, itemId, file) {
   const account = accounts?.[0];
   const spTok = await instance.acquireTokenSilent({ scopes: SHAREPOINT_SCOPE, account });
@@ -1226,7 +1164,7 @@ async function setDonePhotoMetaOnSP(instance, accounts, itemId, fileName) {
     `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${TICKET_LIST_ID}/items/${itemId}/fields`,
     {
       method: "PATCH",
-      headers: { Authorization: `Bearer ${gTok.accessToken}`, "Content-Type":"application/json" },
+      headers: { Authorization: `Bearer ${gTok.accessToken}`, "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }
   );
@@ -1248,15 +1186,14 @@ async function openAttachmentWithToken(instance, accounts, itemId, fileName) {
   setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
 }
 
-/* ===================== Preview Foto Lama ===================== */
+/* ===================== PREVIEW FOTO LAMA ===================== */
 function OldPhotoPreview({ metaName, itemId }) {
   if (!metaName || !itemId) return null;
-  
-  // Fungsi untuk membuat URL lampiran SharePoint
+
   const spAttachmentUrl = (itemId, fileName) => {
     return `${REST_URL}/_api/web/lists(guid'${TICKET_LIST_ID}')/items(${itemId})/AttachmentFiles('${encodeURIComponent(fileName)}')/$value`;
   };
-  
+
   const url = spAttachmentUrl(itemId, metaName);
   return (
     <div className="mt-3">
@@ -1265,12 +1202,12 @@ function OldPhotoPreview({ metaName, itemId }) {
   );
 }
 
-/* ===================== Normalizer Staging ===================== */
+/* ===================== NORMALIZER STAGING ===================== */
 function normalizeStagingRow(v) {
   const f = v.fields || v;
   const divisi = f["Divisi/ Departemen"] || f.Division || f.Divisi || v.Division || "Umum";
   const prior = f.Prioritas || f.Priority || v.Priority || "Normal";
-  
+
   return {
     id: v.id ?? f.id ?? f.ID,
     ticketNo: f.TicketNumber || f["Ticket Number"] || v.TicketNumber || "",
@@ -1301,7 +1238,7 @@ function normalizeStagingRow(v) {
   };
 }
 
-/* ===================== Debug Panel ===================== */
+/* ===================== DEBUG PANEL ===================== */
 function DebugPanel({ data, title = "Debug Info" }) {
   const [isOpen, setIsOpen] = useState(false);
 

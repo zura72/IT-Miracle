@@ -36,25 +36,12 @@ export default function Sidebar() {
   const [activeHover, setActiveHover] = useState(null);
   const [logoLoaded, setLogoLoaded] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
   const location = useLocation();
   const { instance, accounts } = useMsal();
   const navigate = useNavigate();
   const user = accounts[0] || {};
   
   const { dark, toggleDark } = useTheme();
-
-  // Deteksi ukuran layar
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 1024);
-    };
-    
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   useEffect(() => {
     if (location.pathname.startsWith("/charts")) setChartsOpen(true);
@@ -70,10 +57,10 @@ export default function Sidebar() {
 
   useEffect(() => {
     // Close sidebar when route changes on mobile
-    if (isMobile) {
+    if (window.innerWidth < 1024) {
       setSidebarOpen(false);
     }
-  }, [location, isMobile]);
+  }, [location]);
 
   const handleLogout = () => {
     instance.logoutRedirect({
@@ -87,13 +74,6 @@ export default function Sidebar() {
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
-  };
-
-  // Fungsi untuk menangani klik menu
-  const handleMenuClick = () => {
-    if (isMobile) {
-      setSidebarOpen(false);
-    }
   };
 
   return (
@@ -124,9 +104,8 @@ export default function Sidebar() {
           shadow-2xl
           flex flex-col
           overflow-hidden
-          ${sidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full lg:translate-x-0 lg:w-64'}
+          ${sidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full lg:translate-x-0 w-64'}
         `}
-        style={{ willChange: 'transform' }}
       >
         {/* Glow effect */}
         <div className="absolute inset-0 bg-gradient-to-r from-blue-200/10 to-transparent pointer-events-none"></div>
@@ -138,9 +117,8 @@ export default function Sidebar() {
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* Logo dengan animasi */}
             <div 
-              className="flex items-center justify-center mt-8 mb-6 px-4 transform transition-all duration-700"
+              className="flex items-center justify-center mt-8 mb-6 px-4 transition-all duration-700"
               style={{
-                transform: logoLoaded ? 'translateY(0) scale(1)' : 'translateY(-20px) scale(0.95)',
                 opacity: logoLoaded ? 1 : 0
               }}
               onMouseEnter={() => setActiveHover('logo')}
@@ -149,12 +127,12 @@ export default function Sidebar() {
               <div className="relative">
                 {/* Outer glow */}
                 <div className={`absolute -inset-3 bg-blue-200/30 dark:bg-blue-800/30 rounded-full blur-lg transition-all duration-500 ${
-                  activeHover === 'logo' ? 'opacity-100 scale-110' : 'opacity-0 scale-100'
+                  activeHover === 'logo' ? 'opacity-100' : 'opacity-0'
                 }`}></div>
                 
                 {/* Logo container */}
                 <div className={`relative rounded-2xl p-2 bg-gradient-to-br from-white to-blue-100 dark:from-gray-800 dark:to-gray-700 shadow-lg transition-all duration-500 ${
-                  activeHover === 'logo' ? 'ring-4 ring-blue-300/50 dark:ring-blue-600/50 transform rotate-3' : 'ring-2 ring-blue-100/50 dark:ring-gray-600/50'
+                  activeHover === 'logo' ? 'ring-4 ring-blue-300/50 dark:ring-blue-600/50' : 'ring-2 ring-blue-100/50 dark:ring-gray-600/50'
                 }`}>
                   <img
                     src="/logo-wki.png"
@@ -169,10 +147,10 @@ export default function Sidebar() {
               
               <div className="ml-3 md:ml-4">
                 <h1 className="text-lg md:text-xl font-bold text-[#215ba6] dark:text-white tracking-wide leading-tight transition-all duration-500">
-                  <span className={`block transform transition-transform duration-500 ${
+                  <span className={`block transition-all duration-500 ${
                     activeHover === 'logo' ? 'translate-x-1' : ''
                   }`}>Waskita Karya</span>
-                  <span className={`block transform transition-transform duration-500 delay-75 ${
+                  <span className={`block transition-all duration-500 delay-75 ${
                     activeHover === 'logo' ? 'translate-x-2' : ''
                   }`}>Infrastruktur</span>
                 </h1>
@@ -189,11 +167,10 @@ export default function Sidebar() {
                 to="/"
                 className={({ isActive }) =>
                   (isActive
-                    ? "bg-gradient-to-r from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 text-blue-800 dark:text-blue-200 border-r-4 border-blue-500 shadow-inner transform scale-[1.02]"
+                    ? "bg-gradient-to-r from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 text-blue-800 dark:text-blue-200 border-r-4 border-blue-500 shadow-inner"
                     : "text-gray-700 dark:text-gray-300 hover:bg-gradient-to-r hover:from-blue-50/80 hover:to-blue-100/80 dark:hover:from-gray-800 dark:hover:to-gray-700") +
                   " flex items-center px-4 md:px-6 py-2 md:py-3 text-sm md:text-base font-medium rounded-xl transition-all duration-300 mx-1 group relative overflow-hidden"
                 }
-                onClick={handleMenuClick}
               >
                 {/* Hover effect */}
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
@@ -210,11 +187,10 @@ export default function Sidebar() {
                 to="/devices"
                 className={({ isActive }) =>
                   (isActive
-                    ? "bg-gradient-to-r from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 text-blue-800 dark:text-blue-200 border-r-4 border-blue-500 shadow-inner transform scale-[1.02]"
+                    ? "bg-gradient-to-r from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 text-blue-800 dark:text-blue-200 border-r-4 border-blue-500 shadow-inner"
                     : "text-gray-700 dark:text-gray-300 hover:bg-gradient-to-r hover:from-blue-50/80 hover:to-blue-100/80 dark:hover:from-gray-800 dark:hover:to-gray-700") +
                   " flex items-center px-4 md:px-6 py-2 md:py-3 text-sm md:text-base font-medium rounded-xl transition-all duration-300 mx-1 group relative overflow-hidden"
                 }
-                onClick={handleMenuClick}
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 <BsLaptop className="mr-3 md:mr-4 text-lg md:text-xl group-hover:text-blue-600 dark:group-hover:text-blue-300 transition-colors duration-300 relative z-10" /> 
@@ -227,11 +203,10 @@ export default function Sidebar() {
                 to="/peripheral"
                 className={({ isActive }) =>
                   (isActive
-                    ? "bg-gradient-to-r from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 text-blue-800 dark:text-blue-200 border-r-4 border-blue-500 shadow-inner transform scale-[1.02]"
+                    ? "bg-gradient-to-r from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 text-blue-800 dark:text-blue-200 border-r-4 border-blue-500 shadow-inner"
                     : "text-gray-700 dark:text-gray-300 hover:bg-gradient-to-r hover:from-blue-50/80 hover:to-blue-100/80 dark:hover:from-gray-800 dark:hover:to-gray-700") +
                   " flex items-center px-4 md:px-6 py-2 md:py-3 text-sm md:text-base font-medium rounded-xl transition-all duration-300 mx-1 group relative overflow-hidden"
                 }
-                onClick={handleMenuClick}
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 <BsKeyboard className="mr-3 md:mr-4 text-lg md:text-xl group-hover:text-blue-600 dark:group-hover:text-blue-300 transition-colors duration-300 relative z-10" /> 
@@ -244,11 +219,10 @@ export default function Sidebar() {
                 to="/licenses"
                 className={({ isActive }) =>
                   (isActive
-                    ? "bg-gradient-to-r from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 text-blue-800 dark:text-blue-200 border-r-4 border-blue-500 shadow-inner transform scale-[1.02]"
+                    ? "bg-gradient-to-r from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 text-blue-800 dark:text-blue-200 border-r-4 border-blue-500 shadow-inner"
                     : "text-gray-700 dark:text-gray-300 hover:bg-gradient-to-r hover:from-blue-50/80 hover:to-blue-100/80 dark:hover:from-gray-800 dark:hover:to-gray-700") +
                   " flex items-center px-4 md:px-6 py-2 md:py-3 text-sm md:text-base font-medium rounded-xl transition-all duration-300 mx-1 group relative overflow-hidden"
                 }
-                onClick={handleMenuClick}
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 <BsKey className="mr-3 md:mr-4 text-lg md:text-xl group-hover:text-blue-600 dark:group-hover:text-blue-300 transition-colors duration-300 relative z-10" /> 
@@ -262,7 +236,7 @@ export default function Sidebar() {
                   className={
                     "flex items-center px-4 md:px-6 py-2 md:py-3 text-sm md:text-base font-medium rounded-xl transition-all duration-300 w-full group relative overflow-hidden " +
                     (location.pathname.startsWith("/helpdesk")
-                      ? "bg-gradient-to-r from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 text-blue-800 dark:text-blue-200 border-r-4 border-blue-500 shadow-inner transform scale-[1.02]"
+                      ? "bg-gradient-to-r from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 text-blue-800 dark:text-blue-200 border-r-4 border-blue-500 shadow-inner"
                       : "text-gray-700 dark:text-gray-300 hover:bg-gradient-to-r hover:from-blue-50/80 hover:to-blue-100/80 dark:hover:from-gray-800 dark:hover:to-gray-700")
                   }
                   onClick={() => setHelpdeskOpen((o) => !o)}
@@ -282,11 +256,10 @@ export default function Sidebar() {
                       to="/helpdesk/entry"
                       className={({ isActive }) =>
                         (isActive
-                          ? "bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 shadow-inner transform scale-[1.02]"
+                          ? "bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 shadow-inner"
                           : "text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700") +
                         " px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm rounded-lg transition-all duration-300 transform hover:translate-x-1 flex items-center"
                       }
-                      onClick={handleMenuClick}
                     >
                       <BsTicket className="mr-2 text-sm md:text-base" />
                       Ticket Entry
@@ -295,11 +268,10 @@ export default function Sidebar() {
                       to="/helpdesk/solved"
                       className={({ isActive }) =>
                         (isActive
-                          ? "bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 shadow-inner transform scale-[1.02]"
+                          ? "bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 shadow-inner"
                           : "text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700") +
                         " px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm rounded-lg transition-all duration-300 transform hover:translate-x-1 flex items-center"
                       }
-                      onClick={handleMenuClick}
                     >
                       <BsCheckCircle className="mr-2 text-sm md:text-base" />
                       Ticket Solved
@@ -308,11 +280,10 @@ export default function Sidebar() {
                       to="/helpdesk/sharepoint"
                       className={({ isActive }) =>
                         (isActive
-                          ? "bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 shadow-inner transform scale-[1.02]"
+                          ? "bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 shadow-inner"
                           : "text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700") +
                         " px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm rounded-lg transition-all duration-300 transform hover:translate-x-1 flex items-center"
                       }
-                      onClick={handleMenuClick}
                     >
                       <BsShare className="mr-2 text-sm md:text-base" />
                       Data Sharepoint
@@ -327,7 +298,7 @@ export default function Sidebar() {
                   className={
                     "flex items-center px-4 md:px-6 py-2 md:py-3 text-sm md:text-base font-medium rounded-xl transition-all duration-300 w-full group relative overflow-hidden " +
                     (location.pathname.startsWith("/charts")
-                      ? "bg-gradient-to-r from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 text-blue-800 dark:text-blue-200 border-r-4 border-blue-500 shadow-inner transform scale-[1.02]"
+                      ? "bg-gradient-to-r from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 text-blue-800 dark:text-blue-200 border-r-4 border-blue-500 shadow-inner"
                       : "text-gray-700 dark:text-gray-300 hover:bg-gradient-to-r hover:from-blue-50/80 hover:to-blue-100/80 dark:hover:from-gray-800 dark:hover:to-gray-700")
                   }
                   onClick={() => setChartsOpen((o) => !o)}
@@ -347,11 +318,10 @@ export default function Sidebar() {
                       to="/charts/license"
                       className={({ isActive }) =>
                         (isActive
-                          ? "bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 shadow-inner transform scale-[1.02]"
+                          ? "bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 shadow-inner"
                           : "text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700") +
                         " px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm rounded-lg transition-all duration-300 transform hover:translate-x-1 flex items-center"
                       }
-                      onClick={handleMenuClick}
                     >
                       <BsKey className="mr-2 text-sm md:text-base" />
                       License Chart
@@ -360,11 +330,10 @@ export default function Sidebar() {
                       to="/charts/device"
                       className={({ isActive }) =>
                         (isActive
-                          ? "bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 shadow-inner transform scale-[1.02]"
+                          ? "bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 shadow-inner"
                           : "text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700") +
                         " px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm rounded-lg transition-all duration-300 transform hover:translate-x-1 flex items-center"
                       }
-                      onClick={handleMenuClick}
                     >
                       <BsLaptop className="mr-2 text-sm md:text-base" />
                       Device Chart
@@ -373,11 +342,10 @@ export default function Sidebar() {
                       to="/charts/peripheral"
                       className={({ isActive }) =>
                         (isActive
-                          ? "bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 shadow-inner transform scale-[1.02]"
+                          ? "bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 shadow-inner"
                           : "text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700") +
                         " px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm rounded-lg transition-all duration-300 transform hover:translate-x-1 flex items-center"
                       }
-                      onClick={handleMenuClick}
                     >
                       <BsMouse className="mr-2 text-sm md:text-base" />
                       Peripheral Chart
@@ -386,11 +354,10 @@ export default function Sidebar() {
                       to="/charts/helpdesk"
                       className={({ isActive }) =>
                         (isActive
-                          ? "bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 shadow-inner transform scale-[1.02]"
+                          ? "bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 shadow-inner"
                           : "text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700") +
                         " px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm rounded-lg transition-all duration-300 transform hover:translate-x-1 flex items-center"
                       }
-                      onClick={handleMenuClick}
                     >
                       <BsGraphUp className="mr-2 text-sm md:text-base" />
                       Helpdesk Chart
@@ -404,11 +371,10 @@ export default function Sidebar() {
                 to="/settings"
                 className={({ isActive }) =>
                   (isActive
-                    ? "bg-gradient-to-r from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 text-blue-800 dark:text-blue-200 border-r-4 border-blue-500 shadow-inner transform scale-[1.02]"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-gradient-to-r hover:from-blue-50/80 hover:to-blue-100/80 dark:hover:from-gray-800 dark:hover:to-gray-700") +
+                    ? "bg-gradient-to-r from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800 text-blue-800 dark:text-blue-200 border-r-4 border-blue-500 shadow-inner"
+                    : "text-gray-70 dark:text-gray-300 hover:bg-gradient-to-r hover:from-blue-50/80 hover:to-blue-100/80 dark:hover:from-gray-800 dark:hover:to-gray-700") +
                   " flex items-center px-4 md:px-6 py-2 md:py-3 text-sm md:text-base font-medium rounded-xl transition-all duration-300 mx-1 group relative overflow-hidden"
                 }
-                onClick={handleMenuClick}
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
                 <BsGear className="mr-3 md:mr-4 text-lg md:text-xl group-hover:text-blue-600 dark:group-hover:text-blue-300 transition-colors duration-300 relative z-10" /> 
@@ -429,7 +395,7 @@ export default function Sidebar() {
             >
               <div className="relative">
                 <div className={`absolute -inset-1 md:-inset-2 bg-blue-200/30 dark:bg-blue-800/30 rounded-full blur transition-all duration-300 ${
-                  activeHover === 'user' ? 'opacity-100 scale-110' : 'opacity-0 scale-100'
+                  activeHover === 'user' ? 'opacity-100' : 'opacity-0'
                 }`}></div>
                 <BsPersonCircle className="text-gray-600 dark:text-gray-300 text-lg md:text-xl mr-2 md:mr-3 transition-colors duration-300 relative z-10" 
                   style={{ color: activeHover === 'user' ? '#2563eb' : '' }} />
@@ -456,20 +422,14 @@ export default function Sidebar() {
             {userMenuOpen && (
               <div className="mb-3 md:mb-4 p-2 md:p-3 rounded-xl bg-white/90 dark:bg-gray-800/90 shadow-lg animate-fadeIn border border-blue-100/30 dark:border-gray-700/30 backdrop-blur-sm">
                 <button
-                  onClick={() => {
-                    navigate("/profile");
-                    handleMenuClick();
-                  }}
+                  onClick={() => navigate("/profile")}
                   className="w-full text-left px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 rounded-lg transition-all duration-300 flex items-center transform hover:translate-x-1"
                 >
                   <BsPersonCircle className="mr-2 md:mr-3 text-sm md:text-base" />
                   Profil Saya
                 </button>
                 <button
-                  onClick={() => {
-                    navigate("/settings");
-                    handleMenuClick();
-                  }}
+                  onClick={() => navigate("/settings")}
                   className="w-full text-left px-3 md:px-4 py-1.5 md:py-2 text-xs md:text-sm text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 rounded-lg transition-all duration-300 flex items-center transform hover:translate-x-1 mt-1 md:mt-2"
                 >
                   <BsGear className="mr-2 md:mr-3 text-sm md:text-base" />
@@ -508,7 +468,7 @@ export default function Sidebar() {
             {/* Logout Button */}
             <button
               onClick={handleLogout}
-              className="w-full flex items-center justify-center p-2 md:p-3 rounded-xl bg-gradient-to-r from-red-100 to-red-200 dark:from-red-900/30 dark:to-red-800/30 text-red-700 dark:text-red-300 hover:from-red-200 hover:to-red-300 dark:hover:from-red-800/50 dark:hover:to-red-700/50 transition-all duration-300 transform hover:scale-[1.02] shadow-sm hover:shadow-md border border-red-200/50 dark:border-red-800/30"
+              className="w-full flex items-center justify-center p-2 md:p-3 rounded-xl bg-gradient-to-r from-red-100 to-red-200 dark:from-red-900/30 dark:to-red-800/30 text-red-700 dark:text-red-300 hover:from-red-200 hover:to-red-300 dark:hover:from-red-800/50 dark:hover:to-red-700/50 transition-all duration-300 shadow-sm hover:shadow-md border border-red-200/50 dark:border-red-800/30"
               onMouseEnter={() => setActiveHover('logout')}
               onMouseLeave={() => setActiveHover(null)}
             >
@@ -519,39 +479,42 @@ export default function Sidebar() {
           </div>
         </div>
 
-        <style jsx>{`
-          @keyframes fadeIn {
-            from { 
-              opacity: 0; 
-              transform: translateY(-10px) scale(0.95); 
+        {/* CSS Styles - Diubah dari style jsx ke style tag biasa */}
+        <style>
+          {`
+            @keyframes fadeIn {
+              from { 
+                opacity: 0; 
+                transform: translateY(-10px) scale(0.95); 
+              }
+              to { 
+                opacity: 1; 
+                transform: translateY(0) scale(1); 
+              }
             }
-            to { 
-              opacity: 1; 
-              transform: translateY(0) scale(1); 
+            .animate-fadeIn {
+              animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
             }
-          }
-          .animate-fadeIn {
-            animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-          }
-          
-          /* Custom scrollbar for sidebar */
-          nav::-webkit-scrollbar {
-            width: 4px;
-          }
-          
-          nav::-webkit-scrollbar-track {
-            background: transparent;
-          }
-          
-          nav::-webkit-scrollbar-thumb {
-            background: rgba(59, 130, 246, 0.3);
-            border-radius: 10px;
-          }
-          
-          nav::-webkit-scrollbar-thumb:hover {
-            background: rgba(59, 130, 246, 0.5);
-          }
-        `}</style>
+            
+            /* Custom scrollbar for sidebar */
+            nav::-webkit-scrollbar {
+              width: 4px;
+            }
+            
+            nav::-webkit-scrollbar-track {
+              background: transparent;
+            }
+            
+            nav::-webkit-scrollbar-thumb {
+              background: rgba(59, 130, 246, 0.3);
+              border-radius: 10px;
+            }
+            
+            nav::-webkit-scrollbar-thumb:hover {
+              background: rgba(59, 130, 246, 0.5);
+            }
+          `}
+        </style>
       </aside>
     </>
   );
