@@ -3,22 +3,32 @@ import { useMsal } from "@azure/msal-react";
 import { useTheme } from "../../context/ThemeContext";
 import { motion, AnimatePresence } from "framer-motion";
 
-// API Functions - menggunakan fetch untuk berkomunikasi dengan server
+// API Functions - menggunakan fetch untuk berkomunikasi dengan server Railway
 const apiRequest = async (endpoint, options = {}) => {
-  const baseUrl = process.env.REACT_APP_API_URL || "http://localhost:4000";
+  const baseUrl = process.env.REACT_APP_API_URL || "https://it-backend-production.up.railway.app";
   const url = `${baseUrl}${endpoint}`;
   
   try {
-    const response = await fetch(url, {
+    const config = {
       headers: {
         'Content-Type': 'application/json',
         ...options.headers,
       },
       ...options,
-    });
+    };
+
+    // Jika ada body, stringify jika belum string
+    if (config.body && typeof config.body !== 'string') {
+      config.body = JSON.stringify(config.body);
+    }
+
+    console.log(`API Request: ${url}`, config);
+
+    const response = await fetch(url, config);
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
     }
 
     return await response.json();
@@ -163,8 +173,8 @@ export default function TicketEntry() {
     const query = searchQuery.toLowerCase();
     const filtered = tickets.filter(ticket => 
       (ticket.ticketNo && ticket.ticketNo.toLowerCase().includes(query)) ||
-      (ticket.name && ticket.name.toLowerCase().includes(query)) ||
-      (ticket.division && ticket.division.toLowerCase().includes(query)) ||
+      (ticket.user && ticket.user.toLowerCase().includes(query)) ||
+      (ticket.department && ticket.department.toLowerCase().includes(query)) ||
       (ticket.description && ticket.description.toLowerCase().includes(query))
     );
     setFilteredTickets(filtered);
@@ -175,8 +185,10 @@ export default function TicketEntry() {
       setLoading(true);
       setError("");
       
-      // Mengambil tiket dengan status "Belum" dari server
+      // Mengambil tiket dengan status "Belum" dari server Railway
       const data = await apiRequest("/api/tickets?status=Belum");
+      
+      console.log("Data received from server:", data);
       
       // Format data sesuai dengan struktur yang diharapkan komponen
       const formattedTickets = (data.rows || []).map(ticket => ({
@@ -210,10 +222,10 @@ export default function TicketEntry() {
       
       await apiRequest(`/api/tickets/${ticketId}/resolve`, {
         method: "POST",
-        body: JSON.stringify({
+        body: {
           notes: notes || "",
           operator: userName
-        })
+        }
       });
 
       setSuccess("Ticket berhasil diselesaikan");
@@ -231,10 +243,10 @@ export default function TicketEntry() {
       
       await apiRequest(`/api/tickets/${ticketId}/decline`, {
         method: "POST",
-        body: JSON.stringify({
+        body: {
           notes: reason || "",
           operator: userName
-        })
+        }
       });
 
       setSuccess("Ticket berhasil ditolak");
@@ -268,6 +280,22 @@ export default function TicketEntry() {
     setSelectedTicket(ticket);
   };
 
+  // Test koneksi ke backend
+  const testConnection = async () => {
+    try {
+      setLoading(true);
+      const health = await apiRequest("/api/health");
+      console.log("Health check:", health);
+      setSuccess("Koneksi ke backend berhasil!");
+      await loadTickets();
+    } catch (err) {
+      console.error("Connection test failed:", err);
+      setError("Gagal terhubung ke backend: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <motion.div 
       initial={{ opacity: 0 }}
@@ -288,7 +316,10 @@ export default function TicketEntry() {
               Ticket Management
             </h1>
             <p className="text-gray-600 dark:text-gray-400">
-              Kelola tiket yang belum diproses
+              Kelola tiket yang belum diproses - Connected to Railway
+            </p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              Backend: https://it-backend-production.up.railway.app
             </p>
           </motion.div>
           
@@ -332,6 +363,18 @@ export default function TicketEntry() {
             className="flex gap-2"
             variants={staggerChildren}
           >
+            <motion.button
+              onClick={testConnection}
+              disabled={loading}
+              className={`px-4 py-3 rounded-xl font-medium flex items-center gap-2 ${
+                loading ? "bg-gray-400" : "bg-green-600 hover:bg-green-700"
+              } text-white`}
+              whileHover={{ scale: loading ? 1 : 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              {loading ? "⏳" : "🔗"} {loading ? "Testing..." : "Test Connection"}
+            </motion.button>
+
             <motion.button
               onClick={loadTickets}
               disabled={loading}
@@ -414,24 +457,25 @@ export default function TicketEntry() {
                 <th className="p-4 text-left">Priority</th>
                 <th className="p-4 text-left">Description</th>
                 <th className="p-4 text-left">Assignee</th>
+                <th className="p-4 text-left">Status</th>
                 <th className="p-4 text-center">Actions</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center">
+                  <td colSpan={8} className="p-8 text-center">
                     <motion.div 
                       animate={{ rotate: 360 }}
                       transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                       className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto"
                     />
-                    <p className="mt-2 text-gray-500">Memuat tiket...</p>
+                    <p className="mt-2 text-gray-500">Memuat tiket dari server...</p>
                   </td>
                 </tr>
               ) : filteredTickets.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-gray-500">
+                  <td colSpan={8} className="p-8 text-center text-gray-500">
                     {searchQuery ? "Tidak ada tiket yang cocok dengan pencarian" : "Tidak ada tiket yang belum diproses"}
                   </td>
                 </tr>
@@ -447,7 +491,7 @@ export default function TicketEntry() {
                       className={index % 2 === 0 ? (darkMode ? "bg-gray-800" : "bg-white") : (darkMode ? "bg-gray-700" : "bg-gray-50")}
                       whileHover={{ backgroundColor: darkMode ? "rgba(55, 65, 81, 0.5)" : "rgba(243, 244, 246, 0.5)" }}
                     >
-                      <td className="p-4 font-mono">{ticket.ticketNo}</td>
+                      <td className="p-4 font-mono font-bold">{ticket.ticketNo}</td>
                       <td className="p-4">{ticket.user}</td>
                       <td className="p-4">{ticket.department}</td>
                       <td className="p-4">
@@ -456,12 +500,23 @@ export default function TicketEntry() {
                       <td className="p-4 max-w-xs">{ticket.description}</td>
                       <td className="p-4">{ticket.assignee}</td>
                       <td className="p-4">
+                        <span className={`px-2 py-1 rounded-full text-xs ${
+                          ticket.status === 'Belum' ? 'bg-yellow-100 text-yellow-800' :
+                          ticket.status === 'Selesai' ? 'bg-green-100 text-green-800' :
+                          ticket.status === 'Ditolak' ? 'bg-red-100 text-red-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {ticket.status}
+                        </span>
+                      </td>
+                      <td className="p-4">
                         <div className="flex gap-2 justify-center">
                           <motion.button
                             onClick={() => openModal("resolve", ticket)}
                             className="px-3 py-1 bg-green-500 text-white rounded-lg text-sm"
                             whileHover={{ scale: 1.1, boxShadow: "0 0 8px rgba(34, 197, 94, 0.5)" }}
                             whileTap={{ scale: 0.9 }}
+                            title="Selesaikan Ticket"
                           >
                             ✅
                           </motion.button>
@@ -470,6 +525,7 @@ export default function TicketEntry() {
                             className="px-3 py-1 bg-yellow-500 text-white rounded-lg text-sm"
                             whileHover={{ scale: 1.1, boxShadow: "0 0 8px rgba(234, 179, 8, 0.5)" }}
                             whileTap={{ scale: 0.9 }}
+                            title="Tolak Ticket"
                           >
                             ❌
                           </motion.button>
@@ -478,6 +534,7 @@ export default function TicketEntry() {
                             className="px-3 py-1 bg-red-500 text-white rounded-lg text-sm"
                             whileHover={{ scale: 1.1, boxShadow: "0 0 8px rgba(239, 68, 68, 0.5)" }}
                             whileTap={{ scale: 0.9 }}
+                            title="Hapus Ticket"
                           >
                             🗑️
                           </motion.button>
@@ -529,7 +586,7 @@ export default function TicketEntry() {
   );
 }
 
-// Modal Components
+// Modal Components (tetap sama)
 const ResolveModal = ({ ticket, onClose, onSubmit, darkMode }) => {
   const [notes, setNotes] = useState("");
   const [file, setFile] = useState(null);
