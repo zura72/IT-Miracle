@@ -2,65 +2,52 @@
 
 /**
  * Konfigurasi MSAL untuk Azure AD Authentication
- * - Fixed redirect URI untuk production dan development
+ * Compatible dengan @azure/msal-browser v4.x
  */
 
 export function getMsalConfig(persistent = true) {
   // Gunakan environment variables
-  const clientId = process.env.REACT_APP_MSAL_CLIENT_ID;
-  const authority = process.env.REACT_APP_MSAL_AUTHORITY;
+  const clientId = process.env.REACT_APP_MSAL_CLIENT_ID || "f536a53d-8a16-45cf-9acf-d8c77212b605";
+  const authority = process.env.REACT_APP_MSAL_AUTHORITY || "https://login.microsoftonline.com/94526da5-8783-4516-9eb7-8c58bbf66a2d";
   
-  // PERBAIKAN: Logic yang lebih robust untuk detect environment
+  // Redirect URI detection
   const getRedirectUri = () => {
-    // Priority 1: Environment variable (paling tinggi)
+    // Priority 1: Environment variable
     if (process.env.REACT_APP_MSAL_REDIRECT_URI) {
       return process.env.REACT_APP_MSAL_REDIRECT_URI;
     }
     
-    // Priority 2: Detect berdasarkan hostname
+    // Priority 2: Current hostname
     if (typeof window !== 'undefined') {
       const currentHost = window.location.origin;
       
-      // Jika di production domain
+      // Production domain
       if (currentHost.includes('it.waskitainfrastruktur.co.id')) {
         return currentHost;
       }
       
-      // Jika di localhost
+      // Local development
       if (currentHost.includes('localhost') || currentHost.includes('127.0.0.1')) {
-        return 'http://localhost:8080';
+        return process.env.PORT ? `http://localhost:${process.env.PORT}` : 'http://localhost:8080';
       }
       
-      // Fallback ke current host
       return currentHost;
     }
     
-    // Priority 3: Fallback berdasarkan NODE_ENV
-    if (process.env.NODE_ENV === 'production') {
-      return 'https://it.waskitainfrastruktur.co.id';
-    }
-    
-    // Default development
-    return 'http://localhost:8080';
+    // Priority 3: Fallback based on NODE_ENV
+    return process.env.NODE_ENV === 'production' 
+      ? 'https://it.waskitainfrastruktur.co.id'
+      : 'http://localhost:8080';
   };
   
   const redirectUri = getRedirectUri();
-  
-  // Validasi config
-  if (!clientId) {
-    console.error('❌ REACT_APP_MSAL_CLIENT_ID tidak ditemukan');
-  }
-  
-  if (!authority) {
-    console.error('❌ REACT_APP_MSAL_AUTHORITY tidak ditemukan');
-  }
 
-  console.log('🔧 MSAL Configuration:', {
+  console.log('🔧 MSAL Configuration Loaded:', {
     environment: process.env.NODE_ENV,
     clientId: clientId ? '✅ Set' : '❌ Missing',
     authority: authority ? '✅ Set' : '❌ Missing',
     redirectUri: redirectUri,
-    nodeEnv: process.env.NODE_ENV
+    cacheLocation: persistent ? 'localStorage' : 'sessionStorage'
   });
 
   return {
@@ -79,80 +66,60 @@ export function getMsalConfig(persistent = true) {
       loggerOptions: {
         loggerCallback: (level, message, containsPii) => {
           if (containsPii) return;
-          if (level === 0) console.error('MSAL Error:', message);
-          else if (level === 1) console.warn('MSAL Warning:', message);
-          else if (level === 2) console.info('MSAL Info:', message);
-          else if (level === 3) console.debug('MSAL Debug:', message);
+          if (process.env.NODE_ENV === 'development') {
+            if (level === 0) console.error('🔴 MSAL Error:', message);
+            else if (level === 1) console.warn('🟡 MSAL Warning:', message);
+            else if (level === 2) console.info('🔵 MSAL Info:', message);
+          }
         },
         piiLoggingEnabled: false
-      },
-      windowHashTimeout: 60000,
-      iframeHashTimeout: 6000,
-      loadFrameTimeout: 10000
+      }
     }
   };
 }
 
-// Scopes untuk login
+// Login request configuration
 export const loginRequest = {
   scopes: ["User.Read", "openid", "profile"],
   prompt: "select_account"
 };
 
-// Request untuk redirect flow
-export const redirectRequest = {
-  scopes: ["User.Read", "openid", "profile"],
-  prompt: "select_account"
-};
-
-// Scopes untuk silent login
+// Silent request configuration
 export const silentRequest = {
   scopes: ["User.Read"],
   forceRefresh: false
 };
 
-// Export config default
+// Export default config
 export const msalConfig = getMsalConfig(true);
 
-// Helper untuk validasi config
+// Validasi configuration
 export function validateMsalConfig() {
   const config = msalConfig.auth;
   const errors = [];
   
   if (!config.clientId) {
-    errors.push('REACT_APP_MSAL_CLIENT_ID tidak ditemukan');
+    errors.push('REACT_APP_MSAL_CLIENT_ID is required');
   }
   
   if (!config.authority) {
-    errors.push('REACT_APP_MSAL_AUTHORITY tidak ditemukan');
+    errors.push('REACT_APP_MSAL_AUTHORITY is required');
   }
   
   if (!config.redirectUri) {
-    errors.push('Redirect URI tidak valid');
-  }
-  
-  // Validasi khusus untuk production
-  if (process.env.NODE_ENV === 'production') {
-    if (config.redirectUri.includes('localhost')) {
-      errors.push('❌ Redirect URI masih mengarah ke localhost di production!');
-    }
-    
-    if (!config.redirectUri.startsWith('https://')) {
-      errors.push('❌ Redirect URI harus HTTPS di production');
-    }
+    errors.push('Redirect URI is required');
   }
   
   if (errors.length > 0) {
-    console.error('MSAL Config Errors:', errors);
+    console.error('❌ MSAL Configuration Errors:', errors);
     return false;
   }
   
-  console.log('✅ MSAL Config valid untuk environment:', process.env.NODE_ENV);
-  console.log('📍 Redirect URI:', config.redirectUri);
+  console.log('✅ MSAL Configuration is valid');
   return true;
 }
 
-// Cek config saat module load
+// Auto-validate in browser context
 if (typeof window !== 'undefined') {
   validateMsalConfig();
 }
