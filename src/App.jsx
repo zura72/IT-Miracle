@@ -1,53 +1,30 @@
-// src/context/ThemeContext.jsx
-import React, { createContext, useContext, useState, useEffect } from 'react';
+// App.jsx
+import React from "react";
+import { MsalProvider } from "@azure/msal-react";
+import { PublicClientApplication } from "@azure/msal-browser";
+import { useIsAuthenticated } from "@azure/msal-react";
+import { ThemeProvider } from "./context/ThemeContext";
+import Login from "./pages/Login";
+import AppRoutes from "./routes";
+import { getMsalConfig } from "./authConfig"; // Import fungsi config
 
-const ThemeContext = createContext();
+// Inisialisasi MSAL di luar komponen
+const msalInstance = new PublicClientApplication(getMsalConfig(true));
 
-export const useTheme = () => {
-  const context = useContext(ThemeContext);
-  if (!context) {
-    throw new Error('useTheme must be used within a ThemeProvider');
-  }
-  return context;
-};
-
-export const ThemeProvider = ({ children }) => {
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    // Check local storage or system preference
-    const saved = localStorage.getItem('darkMode');
-    if (saved !== null) {
-      return saved === 'true';
-    }
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
-  });
-
-  useEffect(() => {
-    // Save to localStorage
-    localStorage.setItem('darkMode', isDarkMode.toString());
-    
-    // Apply to document
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [isDarkMode]);
-
-  const toggleDarkMode = () => {
-    setIsDarkMode(prev => !prev);
-  };
-
-  const value = {
-    isDarkMode,
-    setIsDarkMode,
-    toggleDarkMode
-  };
-
+function AppContent() {
+  const isAuthenticated = useIsAuthenticated();
+  
   return (
-    <ThemeContext.Provider value={value}>
-      {children}
-    </ThemeContext.Provider>
+    <ThemeProvider>
+      {!isAuthenticated ? <Login /> : <AppRoutes />}
+    </ThemeProvider>
   );
-};
+}
 
-export default ThemeProvider;
+export default function App() {
+  return (
+    <MsalProvider instance={msalInstance}>
+      <AppContent />
+    </MsalProvider>
+  );
+}
