@@ -25,6 +25,6 @@
     "REACT_APP_MSAL_REDIRECT_URI": "https://it.waskitainfrastruktur.co.id",
     "REACT_APP_API_BASE_URL": "https://it-backend-production.up.railway.app/api"
   },
-  "buildCommand": "npm run vercel-build",
+  "buildCommand": "npm run build",
   "outputDirectory": "build"
 }
