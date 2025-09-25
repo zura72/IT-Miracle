@@ -3,11 +3,10 @@ import React, { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useMsal } from "@azure/msal-react";
 import { AuthContext } from "../AppProvider";
 import { useNavigate } from "react-router-dom";
-import { loginRequest, redirectRequest } from "../authConfig";
+import { redirectRequest } from "../authConfig";
 
 /**
- * Login.jsx - Fixed version menggunakan redirect flow
- * Solusi: Ganti popup dengan redirect untuk hindari tab baru
+ * Login.jsx - Fixed version untuk production
  */
 
 const isDev = process.env.NODE_ENV === "development";
@@ -29,11 +28,32 @@ export default function Login() {
   const [configError, setConfigError] = useState(null);
   const [configLoaded, setConfigLoaded] = useState(false);
   const [loginAttempted, setLoginAttempted] = useState(false);
+  const [msalConfig, setMsalConfig] = useState(null);
 
   const navigate = useNavigate();
   const mountedRef = useRef(true);
   const navigatedRef = useRef(false);
   const redirectInProgressRef = useRef(false);
+
+  // ============== PERBAIKAN: Load MSAL config dengan environment aware ==============
+  useEffect(() => {
+    const loadMsalConfig = async () => {
+      try {
+        const { getMsalConfig } = await import("../authConfig");
+        const config = getMsalConfig(rememberMe);
+        setMsalConfig(config);
+        
+        dev.log('MSAL Config loaded:', {
+          redirectUri: config.auth.redirectUri,
+          environment: process.env.NODE_ENV
+        });
+      } catch (error) {
+        console.error('Error loading MSAL config:', error);
+      }
+    };
+
+    loadMsalConfig();
+  }, [rememberMe]);
 
   // ============== helper: fetch JSON dengan timeout ==============
   const fetchJsonSilent = async (url, { timeoutMs = 3500 } = {}) => {
@@ -65,16 +85,21 @@ export default function Login() {
     const loadConfig = async () => {
       setConfigError(null);
 
+      // PERBAIKAN: Gunakan absolute URL berdasarkan environment
+      const baseUrl = window.location.origin;
       const endpoints = [
+        `${baseUrl}/config.json`,
+        `${baseUrl}/api/config`,
         "/config.json",
         "/api/config",
-        "/config",
-        "http://localhost:3001/api/config",
-        "http://localhost:3000/api/config",
+        "http://localhost:3001/api/config"
       ];
 
+      // Hapus duplicate URLs
+      const uniqueEndpoints = [...new Set(endpoints)];
+
       let found = null;
-      for (const u of endpoints) {
+      for (const u of uniqueEndpoints) {
         dev.debug("[config] mencoba:", u);
         const json = await fetchJsonSilent(u);
         if (json && typeof json === "object") {
@@ -127,7 +152,7 @@ export default function Login() {
           if (mountedRef.current && !navigatedRef.current) {
             handlePostLoginNavigation();
           }
-        }, 500);
+        }, 1000);
       }
     };
 
@@ -158,7 +183,7 @@ export default function Login() {
     }
   }, [currentEmail, adminList, navigate, configLoaded, accounts, inProgress]);
 
-  // ================================= PERBAIKAN: Login function dengan REDIRECT ====================================
+  // ================================= PERBAIKAN: Login function dengan environment check ====================================
   const handleLogin = async (e) => {
     if (e) e.preventDefault();
     
@@ -167,12 +192,20 @@ export default function Login() {
       return;
     }
     
+    // PERBAIKAN: Check jika MSAL config sudah loaded
+    if (!msalConfig) {
+      alert("Sistem sedang memuat konfigurasi. Silakan tunggu sebentar dan coba lagi.");
+      return;
+    }
+
     setLoginAttempted(true);
     localStorage.setItem("rememberMe", rememberMe ? "true" : "false");
     setLoading(true);
     
     try {
       dev.log("Starting login process with redirect...");
+      dev.log("Current environment:", process.env.NODE_ENV);
+      dev.log("Redirect URI:", msalConfig.auth.redirectUri);
       
       // Coba silent login dulu (jika ada cached token)
       try {
@@ -195,11 +228,10 @@ export default function Login() {
         // Persist rememberMe setting sebelum redirect
         sessionStorage.setItem('rememberMeDuringRedirect', rememberMe ? 'true' : 'false');
         
-        // Gunakan redirect instead of popup
+        // PERBAIKAN: Gunakan redirect dengan config yang sudah loaded
         await instance.loginRedirect({
           ...redirectRequest,
           scopes: ["User.Read", "openid", "profile"],
-          state: JSON.stringify({ timestamp: Date.now() }) // Optional: add state untuk tracking
         });
         
         // Loading akan tetap true sampai redirect selesai
@@ -211,7 +243,7 @@ export default function Login() {
       redirectInProgressRef.current = false;
       
       // Only show alert untuk error yang bukan redirect-related
-      if (!error.message?.includes("redirect")) {
+      if (!error.message?.includes("redirect") && !error.message?.includes("popup")) {
         alert("Login gagal! Silakan coba lagi atau periksa koneksi internet Anda.");
       }
     }
@@ -219,8 +251,8 @@ export default function Login() {
 
   // =============================== Tampilkan UI berdasarkan state ==================================
   
-  // Case 1: Masih loading config
-  if (!configLoaded) {
+  // Case 1: Masih loading config atau MSAL config
+  if (!configLoaded || !msalConfig) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 to-indigo-100">
         <div className="text-center">
@@ -233,7 +265,8 @@ export default function Login() {
             </div>
           </div>
           <p className="mt-6 text-gray-700 font-medium">Memuat konfigurasi sistem...</p>
-          <p className="mt-2 text-sm text-gray-500">Harap tunggu sebentar</p>
+          <p className="mt-2 text-sm text-gray-500">Environment: {process.env.NODE_ENV}</p>
+          <p className="mt-1 text-sm text-gray-500">Domain: {window.location.hostname}</p>
         </div>
       </div>
     );
@@ -245,9 +278,12 @@ export default function Login() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-indigo-800 to-purple-900">
         <div className="text-center text-white">
           <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-white mx-auto mb-4"></div>
-          <h2 className="text-xl font-semibold mb-2">Mengarahkan ke Login</h2>
+          <h2 className="text-xl font-semibold mb-2">Mengarahkan ke Login Microsoft</h2>
           <p className="text-purple-200">Anda akan diarahkan ke halaman login Microsoft...</p>
-          <p className="text-sm text-purple-300 mt-2">Jika tidak terarah otomatis, periksa browser setting</p>
+          <div className="mt-4 p-4 bg-white/10 rounded-lg">
+            <p className="text-sm text-purple-300">Domain: {window.location.hostname}</p>
+            <p className="text-sm text-purple-300">Redirect URI: {msalConfig.auth.redirectUri}</p>
+          </div>
           <button 
             onClick={() => window.location.reload()}
             className="mt-4 px-4 py-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors"
@@ -318,6 +354,9 @@ export default function Login() {
           <div className="text-center mb-10">
             <h2 className="text-4xl font-bold text-gray-800 mb-3">Masuk ke Sistem</h2>
             <p className="text-gray-600 text-lg">Gunakan akun Microsoft Anda untuk mengakses sistem</p>
+            <div className="mt-2 text-sm text-gray-500">
+              Environment: {process.env.NODE_ENV} | Domain: {window.location.hostname}
+            </div>
           </div>
           
           {configError && (
@@ -362,7 +401,7 @@ export default function Login() {
 
             <button
               type="submit"
-              disabled={loading || redirectInProgressRef.current}
+              disabled={loading || redirectInProgressRef.current || !msalConfig}
               className="w-full py-4 px-6 rounded-xl bg-gradient-to-r from-[#7159d4] to-[#b681ff] hover:from-[#b681ff] hover:to-[#7159d4] text-white font-bold text-lg shadow-lg transition-all duration-300 transform hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center relative overflow-hidden group"
             >
               <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-10 transition-opacity duration-300"></span>
@@ -389,6 +428,9 @@ export default function Login() {
           <div className="mt-12 pt-8 border-t border-gray-100 text-center">
             <p className="text-gray-500 text-base">
               Butuh bantuan? Hubungi tim IT support
+            </p>
+            <p className="text-sm text-gray-400 mt-2">
+              Redirect URI: {msalConfig.auth.redirectUri}
             </p>
           </div>
         </div>
