@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { MsalProvider } from "@azure/msal-react";
 import { PublicClientApplication } from "@azure/msal-browser";
-import { getMsalConfig } from "./pages/authConfig";
+import { getMsalConfig } from "./authConfig";
 
 export const AuthContext = React.createContext({});
 
