@@ -26,7 +26,7 @@ export function getMsalConfig(persistent = true) {
       authority: authority,
       redirectUri: redirectUri,
       postLogoutRedirectUri: redirectUri,
-      navigateToLoginRequestUrl: true, // Diubah ke true untuk handle redirect properly
+      navigateToLoginRequestUrl: false, // DIUBAH: false agar tidak navigate ke Microsoft URL
     },
     cache: {
       cacheLocation: persistent ? "localStorage" : "sessionStorage",
@@ -52,8 +52,15 @@ export function getMsalConfig(persistent = true) {
 
 // Scopes yang lebih minimal dan sesuai kebutuhan
 export const loginRequest = {
-  scopes: ["User.Read", "openid", "profile"], // Hanya scope dasar yang diperlukan
-  prompt: "select_account" // Pastikan user selalu memilih account
+  scopes: ["User.Read", "openid", "profile"],
+  prompt: "select_account"
+};
+
+// Request untuk redirect flow (tambahan)
+export const redirectRequest = {
+  scopes: ["User.Read", "openid", "profile"],
+  prompt: "select_account",
+  redirectStartPage: window.location.origin // Tambahkan ini
 };
 
 // Scopes untuk silent login (lebih terbatas)
