@@ -36,9 +36,9 @@ class ErrorBoundary extends React.Component {
           color: 'white',
           fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif'
         }}>
-          <h1 style={{ fontSize: '2rem', marginBottom: '20px' }}>⚠️ Aplikasi Error</h1>
+          <h1 style={{ fontSize: '2rem', marginBottom: '20px' }}>⚠️ Terjadi Kesalahan</h1>
           <p style={{ fontSize: '1.1rem', marginBottom: '30px' }}>
-            Terjadi kesalahan yang tidak terduga.
+            Aplikasi mengalami masalah teknis. Silakan refresh halaman.
           </p>
           <button 
             onClick={() => window.location.reload()}
@@ -55,6 +55,21 @@ class ErrorBoundary extends React.Component {
           >
             🔄 Refresh Halaman
           </button>
+          {process.env.NODE_ENV === 'development' && (
+            <details style={{ marginTop: '30px', textAlign: 'left', maxWidth: '600px' }}>
+              <summary style={{ cursor: 'pointer', marginBottom: '10px' }}>Detail Error (Development)</summary>
+              <pre style={{ 
+                background: 'rgba(0,0,0,0.2)', 
+                padding: '15px', 
+                borderRadius: '5px',
+                overflow: 'auto',
+                fontSize: '12px',
+                color: '#fff'
+              }}>
+                {this.state.error?.toString()}
+              </pre>
+            </details>
+          )}
         </div>
       );
     }
@@ -98,7 +113,7 @@ const initializeApp = () => {
       if (loadingScreen) {
         loadingScreen.style.display = 'none';
       }
-    }, 1500);
+    }, 1000);
     
   } catch (error) {
     console.error('Failed to initialize app:', error);
@@ -116,9 +131,5 @@ const initializeApp = () => {
   }
 };
 
-// Start the app ketika DOM ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initializeApp);
-} else {
-  initializeApp();
-}
+// Start the app
+initializeApp();
