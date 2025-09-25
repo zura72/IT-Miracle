@@ -1,8 +1,7 @@
 {
   "name": "stok",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "private": true,
-  "type": "module",
   "dependencies": {
     "@azure/msal-browser": "^4.21.0",
     "@azure/msal-react": "^3.0.19",
@@ -27,11 +26,12 @@
     "tailwindcss": "^3.4.4"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
+    "start": "GENERATE_SOURCEMAP=false react-scripts start",
+    "build": "cross-env GENERATE_SOURCEMAP=false react-scripts build",
+    "build:vercel": "cross-env GENERATE_SOURCEMAP=false react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "dev": "cross-env PORT=8080 react-scripts start",
+    "dev": "cross-env PORT=8080 GENERATE_SOURCEMAP=false react-scripts start",
     "server": "cd server && npm run dev",
     "dev:full": "concurrently -k -n BACKEND,FRONTEND -c blue,green \"npm run server\" \"npm run dev\"",
     "vercel-build": "npm run build"
