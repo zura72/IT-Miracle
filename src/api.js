@@ -1,43 +1,66 @@
 // src/utils/api.js
 const API_BASE = process.env.REACT_APP_API_BASE_URL || 
                  process.env.NEXT_PUBLIC_API_URL || 
-                 'http://localhost:4000/api';
+                 'https://it-backend-production.up.railway.app/api/';
 
-console.log('API Base URL:', API_BASE); // Debugging
+console.log('API Base URL:', API_BASE);
 
 // Fungsi helper untuk fetch API
 async function fetchAPI(endpoint, options = {}) {
   // Normalize endpoint (remove leading slash if present)
-  const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const normalizedEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
   const url = `${API_BASE}${normalizedEndpoint}`;
   
-  console.log('API Call:', url); // Debugging
+  console.log('API Call:', url, 'Options:', options);
 
   const config = {
     headers: {
       'Content-Type': 'application/json',
       ...options.headers,
     },
+    // credentials: 'include', // Hapus atau comment ini untuk avoid CORS issues
     ...options,
   };
 
-  // Handle FormData (jika ada, hapus Content-Type agar browser set otomatis)
+  // Jika menggunakan FormData, hapus Content-Type agar browser set otomatis
   if (options.body && options.body instanceof FormData) {
     delete config.headers['Content-Type'];
+    // Jangan gunakan credentials dengan FormData untuk avoid CORS
+    delete config.credentials;
   }
 
   try {
     const response = await fetch(url, config);
     
+    console.log('Response status:', response.status);
+    
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('API Error Response:', errorText);
+      let errorText;
+      try {
+        errorText = await response.text();
+        console.error('API Error Response:', errorText);
+      } catch (e) {
+        errorText = response.statusText;
+      }
       throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
     }
     
-    return await response.json();
+    // Handle case where response might be empty
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      return await response.json();
+    } else {
+      const text = await response.text();
+      return text ? { message: text } : { success: true };
+    }
   } catch (error) {
     console.error('API call failed:', error);
+    
+    // Handle specific CORS error
+    if (error.message.includes('CORS') || error.message.includes('Failed to fetch')) {
+      throw new Error('Cannot connect to server. Please check if the server is running and CORS is configured properly.');
+    }
+    
     throw error;
   }
 }
@@ -60,9 +83,15 @@ export async function createTicket(ticketData) {
     name, division, description, priority, hasPhoto: !!photo
   });
 
-  return fetchAPI('/tickets', {
+  // Debug FormData contents
+  for (let [key, value] of fd.entries()) {
+    console.log(`FormData: ${key} =`, value instanceof File ? `File: ${value.name}` : value);
+  }
+
+  return fetchAPI('tickets', {
     method: 'POST',
-    body: fd,
+    body: fd
+    // credentials dihapus untuk avoid CORS
   });
 }
 
@@ -74,55 +103,81 @@ export async function getTickets(params = {}) {
   if (params.limit) queryParams.append('limit', params.limit);
   
   const queryString = queryParams.toString();
-  const endpoint = queryString ? `/tickets?${queryString}` : '/tickets';
+  const endpoint = queryString ? `tickets?${queryString}` : 'tickets';
   
   return fetchAPI(endpoint);
 }
 
 export async function getTicketById(id) {
-  return fetchAPI(`/tickets/${id}`);
+  return fetchAPI(`tickets/${id}`);
+}
+
+// Helper function untuk handle photo data dari backend
+export function getPhotoUrl(photoData) {
+  if (!photoData) return null;
+  
+  // Jika photoData adalah string URL
+  if (typeof photoData === 'string') {
+    // Jika sudah full URL
+    if (photoData.startsWith('http')) {
+      return photoData;
+    }
+    // Jika relative path
+    if (photoData.startsWith('/')) {
+      return `https://it-backend-production.up.railway.app${photoData}`;
+    }
+    return photoData;
+  }
+  
+  // Jika photoData adalah object (base64 dari backend saat ini)
+  if (typeof photoData === 'object' && photoData.data && photoData.contentType) {
+    // Convert base64 ke data URL untuk sementara
+    return `data:${photoData.contentType};base64,${photoData.data}`;
+  }
+  
+  return null;
 }
 
 export async function resolveTicket(id, data) {
-  return fetchAPI(`/tickets/${id}/resolve`, {
+  return fetchAPI(`tickets/${id}/resolve`, {
     method: 'POST',
     body: JSON.stringify(data)
   });
 }
 
 export async function declineTicket(id, data) {
-  return fetchAPI(`/tickets/${id}/decline`, {
+  return fetchAPI(`tickets/${id}/decline`, {
     method: 'POST',
     body: JSON.stringify(data)
   });
 }
 
 export async function deleteTicket(id) {
-  return fetchAPI(`/tickets/${id}`, {
+  return fetchAPI(`tickets/${id}`, {
     method: 'DELETE'
   });
 }
 
 export async function getDashboardStats() {
-  return fetchAPI('/dashboard/stats');
+  return fetchAPI('dashboard/stats');
 }
 
-// API functions untuk Inventory (jika diperlukan)
+// API functions untuk Inventory
 export async function getDevices() {
-  return fetchAPI('/devices');
+  return fetchAPI('devices');
 }
 
 export async function getLicenses() {
-  return fetchAPI('/licenses');
+  return fetchAPI('licenses');
 }
 
 export async function getPeripherals() {
-  return fetchAPI('/peripherals');
+  return fetchAPI('peripherals');
 }
 
 // Health check
 export async function healthCheck() {
-  return fetchAPI('/health');
+  return fetchAPI('health');
 }
 
 // Test connection

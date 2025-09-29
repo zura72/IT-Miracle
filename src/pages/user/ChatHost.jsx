@@ -12,6 +12,12 @@ export function apiUrl(path = "") {
   return `${normalizedBase}${normalizedPath}`;
 }
 
+// Helper untuk mendapatkan base URL tanpa /api
+export function getBaseUrl() {
+  const base = process.env.REACT_APP_API_BASE || "https://it-backend-production.up.railway.app";
+  return base.replace('/api', '');
+}
+
 /* ===================== API Connection Test ===================== */
 /**
  * Test koneksi ke server API dengan metode GET ke endpoint yang valid
@@ -19,7 +25,7 @@ export function apiUrl(path = "") {
 async function testApiConnection() {
   try {
     // Gunakan endpoint yang lebih umum untuk test koneksi
-    const url = apiUrl(""); 
+    const url = apiUrl("/tickets"); 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000); // Timeout lebih lama untuk production
 
@@ -72,6 +78,7 @@ function useApiConnectionTest() {
   // Test koneksi saat component mount
   useEffect(() => {
     console.log("API Base URL:", apiUrl());
+    console.log("Base URL for images:", getBaseUrl());
     console.log("Environment:", process.env.NODE_ENV);
     console.log("REACT_APP_API_BASE:", process.env.REACT_APP_API_BASE);
     
@@ -158,7 +165,6 @@ async function createTicket({ name, division = "", description, photo }) {
     const response = await fetch(url, {
       method: "POST",
       body: fd,
-      credentials: 'include',
     });
 
     console.log("Response status:", response.status);
@@ -582,10 +588,11 @@ export default function ChatHost() {
     setPhotoFile(f);
     setError(null);
 
+    // Buat URL object untuk preview
     const url = URL.createObjectURL(f);
     pushBot(
       <div className="img-preview fade-in">
-        <img src={url} alt="lampiran" onLoad={() => URL.revokeObjectURL(url)} />
+        <img src={url} alt="Preview lampiran" onLoad={() => URL.revokeObjectURL(url)} />
         <div className="img-caption">Foto diterima: {f.name}</div>
       </div>
     );
@@ -601,6 +608,20 @@ export default function ChatHost() {
       reader.onload = () => resolve(reader.result);
       reader.onerror = error => reject(error);
     });
+  };
+
+  // Helper untuk mendapatkan URL foto lengkap dari backend
+  const getPhotoUrl = (photoPath) => {
+    if (!photoPath) return null;
+    
+    // Jika sudah full URL, gunakan langsung
+    if (photoPath.startsWith('http')) {
+      return photoPath;
+    }
+    
+    // Jika relative path, gabungkan dengan base URL
+    const baseUrl = getBaseUrl();
+    return `${baseUrl}${photoPath}`;
   };
 
   async function submitTicket() {
@@ -645,6 +666,19 @@ export default function ChatHost() {
         // sukses → kunci UI, sembunyikan confirm bar, animasi sukses
         setShowConfirm(false);
         setStage("done");
+
+        // Tampilkan foto jika ada (untuk backend yang sudah support URL)
+        if (res?.ticket?.photo) {
+          const photoUrl = getPhotoUrl(res.ticket.photo);
+          if (photoUrl) {
+            pushBot(
+              <div className="img-preview fade-in">
+                <img src={photoUrl} alt="Lampiran tiket" />
+                <div className="img-caption">Foto terkirim ke sistem</div>
+              </div>
+            );
+          }
+        }
 
         pushBot(
           <SuccessBig

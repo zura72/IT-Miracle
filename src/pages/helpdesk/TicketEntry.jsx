@@ -67,11 +67,11 @@ const StatCard = ({ title, value, color, darkMode, index }) => {
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: index * 0.1 }}
-      className={`p-4 rounded-xl ${colorClasses[color]} shadow-lg hover:shadow-xl transition-shadow duration-300`}
+      className={`p-3 sm:p-4 rounded-xl ${colorClasses[color]} shadow-lg hover:shadow-xl transition-shadow duration-300`}
       whileHover={{ scale: 1.05 }}
     >
-      <div className="text-2xl font-bold">{value}</div>
-      <div className="text-sm opacity-80">{title}</div>
+      <div className="text-lg sm:text-2xl font-bold">{value}</div>
+      <div className="text-xs sm:text-sm opacity-80">{title}</div>
     </motion.div>
   );
 };
@@ -96,7 +96,7 @@ const PriorityBadge = ({ priority, darkMode }) => {
 
   return (
     <motion.span 
-      className={`px-3 py-1 rounded-full text-sm font-medium ${colorClasses[config.color]}`}
+      className={`px-2 py-1 sm:px-3 sm:py-1 rounded-full text-xs sm:text-sm font-medium ${colorClasses[config.color]}`}
       whileHover={{ scale: 1.1 }}
       transition={{ type: "spring", stiffness: 400, damping: 10 }}
     >
@@ -119,11 +119,11 @@ const Modal = ({ title, children, onClose, darkMode }) => (
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.8 }}
       transition={{ type: "spring", damping: 25, stiffness: 300 }}
-      className={`rounded-2xl w-full max-w-md ${darkMode ? "bg-gray-800" : "bg-white"} shadow-2xl`}
+      className={`rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto ${darkMode ? "bg-gray-800" : "bg-white"} shadow-2xl`}
       onClick={(e) => e.stopPropagation()}
     >
-      <div className={`p-6 border-b ${darkMode ? "border-gray-700" : "border-gray-200"} flex justify-between items-center`}>
-        <h3 className="text-xl font-semibold">{title}</h3>
+      <div className={`p-4 sm:p-6 border-b ${darkMode ? "border-gray-700" : "border-gray-200"} flex justify-between items-center sticky top-0 ${darkMode ? "bg-gray-800" : "bg-white"} z-10`}>
+        <h3 className="text-lg sm:text-xl font-semibold">{title}</h3>
         <motion.button 
           onClick={onClose} 
           className="text-2xl hover:opacity-70"
@@ -133,10 +133,257 @@ const Modal = ({ title, children, onClose, darkMode }) => (
           ×
         </motion.button>
       </div>
-      <div className="p-6">{children}</div>
+      <div className="p-4 sm:p-6">{children}</div>
     </motion.div>
   </motion.div>
 );
+
+// Component untuk menampilkan lampiran foto - DIPERBAIKI
+const AttachmentViewer = ({ attachment, ticketNo, darkMode }) => {
+  const [showImageModal, setShowImageModal] = useState(false);
+  
+  // PERBAIKAN: Validasi yang lebih aman untuk attachment
+  const isValidAttachment = (att) => {
+    if (!att) return false;
+    if (typeof att !== 'string') return false;
+    if (att.trim() === '') return false;
+    return true;
+  };
+
+  // Fungsi untuk mendapatkan URL gambar yang lengkap
+  const getImageUrl = (imgPath) => {
+    if (!imgPath || typeof imgPath !== 'string') return null;
+    
+    // Jika sudah URL lengkap, langsung return
+    if (imgPath.startsWith('http')) return imgPath;
+    
+    // Jika path relatif (misal: /uploads/filename.jpg), gabungkan dengan base URL
+    const baseUrl = process.env.REACT_APP_API_URL || "https://it-backend-production.up.railway.app";
+    
+    // Pastikan path dimulai dengan slash
+    const normalizedPath = imgPath.startsWith('/') ? imgPath : `/${imgPath}`;
+    return `${baseUrl}${normalizedPath}`;
+  };
+
+  const imageUrl = isValidAttachment(attachment) ? getImageUrl(attachment) : null;
+
+  // Jika tidak ada attachment yang valid
+  if (!imageUrl) {
+    return (
+      <span className="text-gray-500 text-sm">Tidak ada lampiran</span>
+    );
+  }
+
+  return (
+    <>
+      <motion.button
+        onClick={() => setShowImageModal(true)}
+        className={`flex items-center gap-2 px-3 py-1 rounded-lg ${
+          darkMode ? "bg-blue-900/30 hover:bg-blue-900/50" : "bg-blue-100 hover:bg-blue-200"
+        } transition-colors`}
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+      >
+        <span>📎</span>
+        <span className="text-sm">Lihat Foto</span>
+      </motion.button>
+
+      <AnimatePresence>
+        {showImageModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowImageModal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              className="relative max-w-4xl max-h-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className={`p-4 ${darkMode ? "bg-gray-800" : "bg-white"} rounded-t-lg flex justify-between items-center`}>
+                <h3 className="font-semibold">Lampiran Ticket {ticketNo}</h3>
+                <motion.button 
+                  onClick={() => setShowImageModal(false)}
+                  className="text-2xl hover:opacity-70"
+                  whileHover={{ scale: 1.2 }}
+                  whileTap={{ scale: 0.9 }}
+                >
+                  ×
+                </motion.button>
+              </div>
+              <div className="bg-black flex items-center justify-center p-4 rounded-b-lg">
+                <img 
+                  src={imageUrl} 
+                  alt={`Lampiran ticket ${ticketNo}`}
+                  className="max-w-full max-h-[70vh] object-contain"
+                  onError={(e) => {
+                    console.error('Gagal memuat gambar:', imageUrl);
+                    e.target.onerror = null;
+                    e.target.src = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjEwMCIgeT0iMTAwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiM2NjYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5HYWdhbCBtdW5jdWwgbWVtdWF0IGdhbWJhcjwvdGV4dD48L3N2Zz4=";
+                  }}
+                  onLoad={() => console.log('Gambar berhasil dimuat:', imageUrl)}
+                />
+              </div>
+              <div className="flex justify-center mt-2">
+                <a 
+                  href={imageUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className={`px-4 py-2 rounded-lg ${
+                    darkMode ? "bg-blue-600 hover:bg-blue-700" : "bg-blue-500 hover:bg-blue-600"
+                  } text-white text-sm`}
+                >
+                  Buka di Tab Baru
+                </a>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+};
+
+// Thumbnail component untuk preview gambar kecil
+const ImageThumbnail = ({ src, alt, className = "" }) => {
+  const [imageError, setImageError] = useState(false);
+
+  if (!src || imageError) {
+    return (
+      <div className={`flex items-center justify-center bg-gray-200 text-gray-500 ${className}`}>
+        <span>📷</span>
+      </div>
+    );
+  }
+
+  return (
+    <img 
+      src={src}
+      alt={alt}
+      className={`object-cover ${className}`}
+      onError={() => setImageError(true)}
+    />
+  );
+};
+
+// Mobile Ticket Card Component
+const MobileTicketCard = ({ ticket, index, darkMode, onAction }) => {
+  // Fungsi untuk mendapatkan URL gambar
+  const getImageUrl = (imgPath) => {
+    if (!imgPath || typeof imgPath !== 'string') return null;
+    if (imgPath.startsWith('http')) return imgPath;
+    const baseUrl = process.env.REACT_APP_API_URL || "https://it-backend-production.up.railway.app";
+    const normalizedPath = imgPath.startsWith('/') ? imgPath : `/${imgPath}`;
+    return `${baseUrl}${normalizedPath}`;
+  };
+
+  const imageUrl = ticket.attachment && typeof ticket.attachment === 'string' ? getImageUrl(ticket.attachment) : null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, delay: index * 0.05 }}
+      className={`p-4 rounded-xl mb-3 ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg`}
+      whileHover={{ scale: 1.02 }}
+    >
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        <div>
+          <div className="text-xs text-gray-500">Ticket #</div>
+          <div className="font-mono font-bold text-sm">{ticket.ticketNo}</div>
+        </div>
+        <div>
+          <div className="text-xs text-gray-500">Priority</div>
+          <div className="flex justify-end">
+            <PriorityBadge priority={ticket.priority} darkMode={darkMode} />
+          </div>
+        </div>
+      </div>
+
+      {/* Thumbnail preview untuk mobile */}
+      {imageUrl && (
+        <div className="mb-3">
+          <div className="text-xs text-gray-500 mb-1">Preview Foto</div>
+          <div className="flex justify-center">
+            <ImageThumbnail 
+              src={imageUrl}
+              alt={`Preview ${ticket.ticketNo}`}
+              className="w-20 h-20 rounded-lg border-2 border-gray-300"
+            />
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-2 mb-3">
+        <div>
+          <div className="text-xs text-gray-500">User</div>
+          <div className="text-sm font-medium">{ticket.user}</div>
+        </div>
+        <div>
+          <div className="text-xs text-gray-500">Divisi</div>
+          <div className="text-sm">{ticket.department}</div>
+        </div>
+        <div>
+          <div className="text-xs text-gray-500">Description</div>
+          <div className="text-sm line-clamp-2">{ticket.description}</div>
+        </div>
+        <div>
+          <div className="text-xs text-gray-500">Assignee</div>
+          <div className="text-sm">{ticket.assignee}</div>
+        </div>
+        <div>
+          <div className="text-xs text-gray-500">Status</div>
+          <span className={`px-2 py-1 rounded-full text-xs ${
+            ticket.status === 'Belum' ? 'bg-yellow-100 text-yellow-800' :
+            ticket.status === 'Selesai' ? 'bg-green-100 text-green-800' :
+            ticket.status === 'Ditolak' ? 'bg-red-100 text-red-800' :
+            'bg-gray-100 text-gray-800'
+          }`}>
+            {ticket.status}
+          </span>
+        </div>
+        <div>
+          <div className="text-xs text-gray-500">Lampiran</div>
+          <AttachmentViewer attachment={ticket.attachment} ticketNo={ticket.ticketNo} darkMode={darkMode} />
+        </div>
+      </div>
+
+      <div className="flex gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+        <motion.button
+          onClick={() => onAction("resolve", ticket)}
+          className="flex-1 px-3 py-2 bg-green-500 text-white rounded-lg text-sm flex items-center justify-center gap-1"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <span>✅</span>
+          <span>Selesai</span>
+        </motion.button>
+        <motion.button
+          onClick={() => onAction("decline", ticket)}
+          className="flex-1 px-3 py-2 bg-yellow-500 text-white rounded-lg text-sm flex items-center justify-center gap-1"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <span>❌</span>
+          <span>Tolak</span>
+        </motion.button>
+        <motion.button
+          onClick={() => onAction("delete", ticket)}
+          className="flex-1 px-3 py-2 bg-red-500 text-white rounded-lg text-sm flex items-center justify-center gap-1"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <span>🗑️</span>
+          <span>Hapus</span>
+        </motion.button>
+      </div>
+    </motion.div>
+  );
+};
 
 // Main Component
 export default function TicketEntry() {
@@ -150,9 +397,20 @@ export default function TicketEntry() {
   const [success, setSuccess] = useState("");
   const [activeModal, setActiveModal] = useState(null);
   const [selectedTicket, setSelectedTicket] = useState(null);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   const user = accounts[0];
   const userName = user?.name || "Admin";
+
+  // Effect untuk mendeteksi perubahan ukuran layar
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Stats calculation berdasarkan data real
   const stats = {
@@ -190,21 +448,34 @@ export default function TicketEntry() {
       
       console.log("Data received from server:", data);
       
-      // Format data sesuai dengan struktur yang diharapkan komponen
-      const formattedTickets = (data.rows || []).map(ticket => ({
-        id: ticket._id || ticket.id,
-        ticketNo: ticket.ticketNo,
-        createdAt: ticket.createdAt,
-        user: ticket.name,
-        department: ticket.division,
-        priority: ticket.priority || "Normal",
-        description: ticket.description,
-        assignee: ticket.assignee || userName,
-        attachment: ticket.photo,
-        status: ticket.status,
-        notes: ticket.notes,
-        operator: ticket.operator
-      }));
+      // PERBAIKAN: Validasi data sebelum mapping
+      const formattedTickets = (data.rows || []).map(ticket => {
+        // Pastikan attachment adalah string yang valid
+        let attachment = '';
+        if (ticket.photo) {
+          if (typeof ticket.photo === 'string') {
+            attachment = ticket.photo;
+          } else if (typeof ticket.photo === 'object' && ticket.photo !== null) {
+            // Jika photo adalah object, coba ambil path/url dari properti yang sesuai
+            attachment = ticket.photo.path || ticket.photo.url || '';
+          }
+        }
+      
+        return {
+          id: ticket._id || ticket.id,
+          ticketNo: ticket.ticketNo,
+          createdAt: ticket.createdAt,
+          user: ticket.name,
+          department: ticket.division,
+          priority: ticket.priority || "Normal",
+          description: ticket.description,
+          assignee: ticket.assignee || userName,
+          attachment: attachment, // Sekarang ini adalah string URL path
+          status: ticket.status,
+          notes: ticket.notes,
+          operator: ticket.operator
+        };
+      });
       
       setTickets(formattedTickets);
     } catch (err) {
@@ -301,30 +572,30 @@ export default function TicketEntry() {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
-      className={`min-h-screen p-6 ${darkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}
+      className={`min-h-screen p-3 sm:p-6 ${darkMode ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"}`}
     >
       {/* Header Section */}
       <motion.div 
         variants={fadeIn}
         initial="hidden"
         animate="visible"
-        className={`rounded-2xl p-6 mb-6 ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg`}
+        className={`rounded-2xl p-4 sm:p-6 mb-6 ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg`}
       >
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           <motion.div variants={slideIn}>
-            <h1 className="text-3xl font-bold text-blue-600 dark:text-blue-400 mb-2">
+            <h1 className="text-2xl sm:text-3xl font-bold text-blue-600 dark:text-blue-400 mb-2">
               Ticket Management
             </h1>
-            <p className="text-gray-600 dark:text-gray-400">
+            <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base">
               Kelola tiket yang belum diproses - Connected to Railway
             </p>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
               Backend: https://it-backend-production.up.railway.app
             </p>
           </motion.div>
           
           <motion.div 
-            className="flex gap-3"
+            className="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0"
             variants={staggerChildren}
             initial="hidden"
             animate="visible"
@@ -337,7 +608,7 @@ export default function TicketEntry() {
 
         {/* Search and Actions */}
         <motion.div 
-          className="flex flex-col md:flex-row gap-4"
+          className="flex flex-col gap-4"
           variants={fadeIn}
         >
           <div className="flex-1">
@@ -353,20 +624,20 @@ export default function TicketEntry() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className={`w-full px-4 py-3 rounded-xl border ${
                   darkMode ? "bg-gray-700 border-gray-600 text-white" : "border-gray-300"
-                } focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300`}
+                } focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-300 text-sm sm:text-base`}
               />
               <span className="absolute right-3 top-3 text-gray-400">🔍</span>
             </motion.div>
           </div>
           
           <motion.div 
-            className="flex gap-2"
+            className="flex gap-2 flex-wrap"
             variants={staggerChildren}
           >
             <motion.button
               onClick={testConnection}
               disabled={loading}
-              className={`px-4 py-3 rounded-xl font-medium flex items-center gap-2 ${
+              className={`px-3 sm:px-4 py-2 sm:py-3 rounded-xl font-medium flex items-center gap-2 text-sm sm:text-base ${
                 loading ? "bg-gray-400" : "bg-green-600 hover:bg-green-700"
               } text-white`}
               whileHover={{ scale: loading ? 1 : 1.05 }}
@@ -378,7 +649,7 @@ export default function TicketEntry() {
             <motion.button
               onClick={loadTickets}
               disabled={loading}
-              className={`px-4 py-3 rounded-xl font-medium flex items-center gap-2 ${
+              className={`px-3 sm:px-4 py-2 sm:py-3 rounded-xl font-medium flex items-center gap-2 text-sm sm:text-base ${
                 loading ? "bg-gray-400" : "bg-blue-600 hover:bg-blue-700"
               } text-white`}
               whileHover={{ scale: loading ? 1 : 1.05 }}
@@ -389,7 +660,7 @@ export default function TicketEntry() {
             
             <motion.button
               onClick={() => window.print()}
-              className={`px-4 py-3 rounded-xl border ${
+              className={`px-3 sm:px-4 py-2 sm:py-3 rounded-xl border text-sm sm:text-base ${
                 darkMode ? "border-gray-600 hover:bg-gray-700" : "border-gray-300 hover:bg-gray-100"
               } flex items-center gap-2`}
               whileHover={{ scale: 1.05 }}
@@ -409,11 +680,11 @@ export default function TicketEntry() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -50 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className={`mb-6 p-4 rounded-xl ${
+            className={`mb-6 p-3 sm:p-4 rounded-xl ${
               darkMode ? "bg-red-900/30 border-red-700" : "bg-red-50 border-red-200"
             } border`}
           >
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center text-sm sm:text-base">
               <span>❌ {error}</span>
               <button onClick={() => setError("")} className="text-sm underline">Tutup</button>
             </div>
@@ -428,11 +699,11 @@ export default function TicketEntry() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -50 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className={`mb-6 p-4 rounded-xl ${
+            className={`mb-6 p-3 sm:p-4 rounded-xl ${
               darkMode ? "bg-green-900/30 border-green-700" : "bg-green-50 border-green-200"
             } border`}
           >
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center text-sm sm:text-base">
               <span>✅ {success}</span>
               <button onClick={() => setSuccess("")} className="text-sm underline">Tutup</button>
             </div>
@@ -440,114 +711,156 @@ export default function TicketEntry() {
         )}
       </AnimatePresence>
 
-      {/* Tickets Table */}
-      <motion.div 
-        variants={fadeIn}
-        initial="hidden"
-        animate="visible"
-        className={`rounded-2xl overflow-hidden ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg`}
-      >
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className={darkMode ? "bg-gray-700" : "bg-gray-100"}>
-                <th className="p-4 text-left">Ticket #</th>
-                <th className="p-4 text-left">User</th>
-                <th className="p-4 text-left">Divisi</th>
-                <th className="p-4 text-left">Priority</th>
-                <th className="p-4 text-left">Description</th>
-                <th className="p-4 text-left">Assignee</th>
-                <th className="p-4 text-left">Status</th>
-                <th className="p-4 text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={8} className="p-8 text-center">
-                    <motion.div 
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                      className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto"
-                    />
-                    <p className="mt-2 text-gray-500">Memuat tiket dari server...</p>
-                  </td>
+      {/* Tickets Display - Responsive */}
+      {isMobile ? (
+        /* Mobile View - Card Layout */
+        <motion.div 
+          variants={fadeIn}
+          initial="hidden"
+          animate="visible"
+          className="space-y-3"
+        >
+          {loading ? (
+            <div className="text-center p-8">
+              <motion.div 
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto"
+              />
+              <p className="mt-2 text-gray-500">Memuat tiket dari server...</p>
+            </div>
+          ) : filteredTickets.length === 0 ? (
+            <div className="text-center p-8 text-gray-500">
+              {searchQuery ? "Tidak ada tiket yang cocok dengan pencarian" : "Tidak ada tiket yang belum diproses"}
+            </div>
+          ) : (
+            <AnimatePresence>
+              {filteredTickets.map((ticket, index) => (
+                <MobileTicketCard 
+                  key={ticket.id}
+                  ticket={ticket}
+                  index={index}
+                  darkMode={darkMode}
+                  onAction={openModal}
+                />
+              ))}
+            </AnimatePresence>
+          )}
+        </motion.div>
+      ) : (
+        /* Desktop View - Table Layout */
+        <motion.div 
+          variants={fadeIn}
+          initial="hidden"
+          animate="visible"
+          className={`rounded-2xl overflow-hidden ${darkMode ? "bg-gray-800" : "bg-white"} shadow-lg`}
+        >
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className={darkMode ? "bg-gray-700" : "bg-gray-100"}>
+                  <th className="p-4 text-left">Ticket #</th>
+                  <th className="p-4 text-left">User</th>
+                  <th className="p-4 text-left">Divisi</th>
+                  <th className="p-4 text-left">Priority</th>
+                  <th className="p-4 text-left">Description</th>
+                  <th className="p-4 text-left">Lampiran</th>
+                  <th className="p-4 text-left">Assignee</th>
+                  <th className="p-4 text-left">Status</th>
+                  <th className="p-4 text-center">Actions</th>
                 </tr>
-              ) : filteredTickets.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="p-8 text-center text-gray-500">
-                    {searchQuery ? "Tidak ada tiket yang cocok dengan pencarian" : "Tidak ada tiket yang belum diproses"}
-                  </td>
-                </tr>
-              ) : (
-                <AnimatePresence>
-                  {filteredTickets.map((ticket, index) => (
-                    <motion.tr 
-                      key={ticket.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -20 }}
-                      transition={{ duration: 0.3, delay: index * 0.05 }}
-                      className={index % 2 === 0 ? (darkMode ? "bg-gray-800" : "bg-white") : (darkMode ? "bg-gray-700" : "bg-gray-50")}
-                      whileHover={{ backgroundColor: darkMode ? "rgba(55, 65, 81, 0.5)" : "rgba(243, 244, 246, 0.5)" }}
-                    >
-                      <td className="p-4 font-mono font-bold">{ticket.ticketNo}</td>
-                      <td className="p-4">{ticket.user}</td>
-                      <td className="p-4">{ticket.department}</td>
-                      <td className="p-4">
-                        <PriorityBadge priority={ticket.priority} darkMode={darkMode} />
-                      </td>
-                      <td className="p-4 max-w-xs">{ticket.description}</td>
-                      <td className="p-4">{ticket.assignee}</td>
-                      <td className="p-4">
-                        <span className={`px-2 py-1 rounded-full text-xs ${
-                          ticket.status === 'Belum' ? 'bg-yellow-100 text-yellow-800' :
-                          ticket.status === 'Selesai' ? 'bg-green-100 text-green-800' :
-                          ticket.status === 'Ditolak' ? 'bg-red-100 text-red-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {ticket.status}
-                        </span>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex gap-2 justify-center">
-                          <motion.button
-                            onClick={() => openModal("resolve", ticket)}
-                            className="px-3 py-1 bg-green-500 text-white rounded-lg text-sm"
-                            whileHover={{ scale: 1.1, boxShadow: "0 0 8px rgba(34, 197, 94, 0.5)" }}
-                            whileTap={{ scale: 0.9 }}
-                            title="Selesaikan Ticket"
-                          >
-                            ✅
-                          </motion.button>
-                          <motion.button
-                            onClick={() => openModal("decline", ticket)}
-                            className="px-3 py-1 bg-yellow-500 text-white rounded-lg text-sm"
-                            whileHover={{ scale: 1.1, boxShadow: "0 0 8px rgba(234, 179, 8, 0.5)" }}
-                            whileTap={{ scale: 0.9 }}
-                            title="Tolak Ticket"
-                          >
-                            ❌
-                          </motion.button>
-                          <motion.button
-                            onClick={() => openModal("delete", ticket)}
-                            className="px-3 py-1 bg-red-500 text-white rounded-lg text-sm"
-                            whileHover={{ scale: 1.1, boxShadow: "0 0 8px rgba(239, 68, 68, 0.5)" }}
-                            whileTap={{ scale: 0.9 }}
-                            title="Hapus Ticket"
-                          >
-                            🗑️
-                          </motion.button>
-                        </div>
-                      </td>
-                    </motion.tr>
-                  ))}
-                </AnimatePresence>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </motion.div>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={9} className="p-8 text-center">
+                      <motion.div 
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto"
+                      />
+                      <p className="mt-2 text-gray-500">Memuat tiket dari server...</p>
+                    </td>
+                  </tr>
+                ) : filteredTickets.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="p-8 text-center text-gray-500">
+                      {searchQuery ? "Tidak ada tiket yang cocok dengan pencarian" : "Tidak ada tiket yang belum diproses"}
+                    </td>
+                  </tr>
+                ) : (
+                  <AnimatePresence>
+                    {filteredTickets.map((ticket, index) => (
+                      <motion.tr 
+                        key={ticket.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        transition={{ duration: 0.3, delay: index * 0.05 }}
+                        className={index % 2 === 0 ? (darkMode ? "bg-gray-800" : "bg-white") : (darkMode ? "bg-gray-700" : "bg-gray-50")}
+                        whileHover={{ backgroundColor: darkMode ? "rgba(55, 65, 81, 0.5)" : "rgba(243, 244, 246, 0.5)" }}
+                      >
+                        <td className="p-4 font-mono font-bold">{ticket.ticketNo}</td>
+                        <td className="p-4">{ticket.user}</td>
+                        <td className="p-4">{ticket.department}</td>
+                        <td className="p-4">
+                          <PriorityBadge priority={ticket.priority} darkMode={darkMode} />
+                        </td>
+                        <td className="p-4 max-w-xs">{ticket.description}</td>
+                        <td className="p-4">
+                          <AttachmentViewer attachment={ticket.attachment} ticketNo={ticket.ticketNo} darkMode={darkMode} />
+                        </td>
+                        <td className="p-4">{ticket.assignee}</td>
+                        <td className="p-4">
+                          <span className={`px-2 py-1 rounded-full text-xs ${
+                            ticket.status === 'Belum' ? 'bg-yellow-100 text-yellow-800' :
+                            ticket.status === 'Selesai' ? 'bg-green-100 text-green-800' :
+                            ticket.status === 'Ditolak' ? 'bg-red-100 text-red-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {ticket.status}
+                          </span>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex gap-2 justify-center">
+                            <motion.button
+                              onClick={() => openModal("resolve", ticket)}
+                              className="px-3 py-1 bg-green-500 text-white rounded-lg text-sm"
+                              whileHover={{ scale: 1.1, boxShadow: "0 0 8px rgba(34, 197, 94, 0.5)" }}
+                              whileTap={{ scale: 0.9 }}
+                              title="Selesaikan Ticket"
+                            >
+                              ✅
+                            </motion.button>
+                            <motion.button
+                              onClick={() => openModal("decline", ticket)}
+                              className="px-3 py-1 bg-yellow-500 text-white rounded-lg text-sm"
+                              whileHover={{ scale: 1.1, boxShadow: "0 0 8px rgba(234, 179, 8, 0.5)" }}
+                              whileTap={{ scale: 0.9 }}
+                              title="Tolak Ticket"
+                            >
+                              ❌
+                            </motion.button>
+                            <motion.button
+                              onClick={() => openModal("delete", ticket)}
+                              className="px-3 py-1 bg-red-500 text-white rounded-lg text-sm"
+                              whileHover={{ scale: 1.1, boxShadow: "0 0 8px rgba(239, 68, 68, 0.5)" }}
+                              whileTap={{ scale: 0.9 }}
+                              title="Hapus Ticket"
+                            >
+                              🗑️
+                            </motion.button>
+                          </div>
+                        </td>
+                      </motion.tr>
+                    ))}
+                  </AnimatePresence>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </motion.div>
+      )}
 
       {/* Modals */}
       <AnimatePresence>
@@ -586,7 +899,7 @@ export default function TicketEntry() {
   );
 }
 
-// Modal Components (tetap sama)
+// Modal Components
 const ResolveModal = ({ ticket, onClose, onSubmit, darkMode }) => {
   const [notes, setNotes] = useState("");
   const [file, setFile] = useState(null);

@@ -13,7 +13,9 @@ import {
   FaTools,
   FaBoxOpen,
   FaSync,
-  FaChevronRight
+  FaChevronRight,
+  FaBars,
+  FaSearch
 } from "react-icons/fa";
 import { useTheme } from "../context/ThemeContext";
 import { motion, AnimatePresence } from "framer-motion";
@@ -72,6 +74,10 @@ export default function Dashboard() {
     zeroStockItems: 0,
     licenseWarnings: 0
   });
+
+  // State untuk mobile
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
 
   useEffect(() => {
     if (accounts.length) fetchAll();
@@ -197,6 +203,7 @@ export default function Dashboard() {
   }
   const latestActivities = getLatestActivity();
 
+  // Loading state
   if (loading) {
     return (
       <div className={`min-h-screen flex items-center justify-center ${darkMode ? 'dark bg-gray-900' : 'bg-gray-50'}`}>
@@ -221,46 +228,80 @@ export default function Dashboard() {
 
   return (
     <div className={`min-h-screen transition-colors duration-500 ${darkMode ? 'dark bg-gradient-to-br from-gray-900 to-gray-800 text-white' : 'bg-gradient-to-br from-blue-50 to-gray-100 text-gray-900'} px-2 sm:px-4 py-4`}>
-      {/* Header */}
+      
+      {/* Enhanced Mobile Header */}
       <motion.div 
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className={`px-4 py-3 sm:px-6 sm:py-4 rounded-xl mb-4 ${darkMode ? 'bg-gray-800' : 'bg-blue-600 text-white'} shadow-lg`}
+        className={`sticky top-0 z-40 px-3 py-3 rounded-xl mb-4 ${darkMode ? 'bg-gray-800' : 'bg-blue-600 text-white'} shadow-lg`}
       >
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
-          <div className="mb-3 sm:mb-0">
-            <h1 className="text-xl sm:text-2xl font-bold">IT Asset Dashboard</h1>
-            <p className="text-xs sm:text-sm opacity-80">Manajemen aset TI terintegrasi</p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <button 
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="lg:hidden p-2 rounded-lg bg-white/10"
+            >
+              <FaBars size={16} />
+            </button>
+            <div>
+              <h1 className="text-lg font-bold">IT Asset Dashboard</h1>
+              <p className="text-xs opacity-80 hidden sm:block">Manajemen aset TI terintegrasi</p>
+            </div>
           </div>
-          <div className="flex items-center space-x-2 sm:space-x-4 self-end sm:self-auto">
+          
+          <div className="flex items-center space-x-2">
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={handleRefresh}
               disabled={refreshing}
-              className={`p-2 rounded-full ${darkMode ? 'bg-gray-700' : 'bg-white/20'} transition-colors flex items-center`}
+              className={`p-2 rounded-full ${darkMode ? 'bg-gray-700' : 'bg-white/20'} transition-colors`}
             >
               <motion.div
                 animate={{ rotate: refreshing ? 360 : 0 }}
                 transition={{ duration: 1, repeat: refreshing ? Infinity : 0, ease: "linear" }}
               >
-                <FaSync className={refreshing ? "text-blue-400" : darkMode ? "text-gray-300" : "text-white"} size={16} />
+                <FaSync className={refreshing ? "text-blue-400" : darkMode ? "text-gray-300" : "text-white"} size={14} />
               </motion.div>
             </motion.button>
-            <div className={`px-2 py-1 sm:px-3 sm:py-1 rounded-full text-xs ${darkMode ? 'bg-gray-700' : 'bg-white/20'}`}>
+            
+            <div className={`px-2 py-1 rounded-full text-xs ${darkMode ? 'bg-gray-700' : 'bg-white/20'}`}>
               {new Date().toLocaleDateString('id-ID', { 
-                weekday: 'short', 
-                year: 'numeric', 
-                month: 'short', 
-                day: 'numeric' 
+                day: 'numeric', 
+                month: 'short'
               })}
             </div>
           </div>
         </div>
+
+        {/* Mobile Navigation Tabs */}
+        <div className="flex space-x-1 mt-3 overflow-x-auto pb-1">
+          {["overview", "devices", "peripheral", "licenses"].map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-3 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
+                activeTab === tab 
+                  ? darkMode 
+                    ? 'bg-white text-blue-600' 
+                    : 'bg-white text-blue-600'
+                  : darkMode 
+                    ? 'bg-gray-700/50 text-gray-300' 
+                    : 'bg-white/20 text-white'
+              }`}
+            >
+              {tab === "overview" && "Overview"}
+              {tab === "devices" && "Devices"}
+              {tab === "peripheral" && "Peripheral"}
+              {tab === "licenses" && "Licenses"}
+            </button>
+          ))}
+        </div>
       </motion.div>
 
       <div className="container mx-auto px-1 sm:px-2 py-2">
-        {/* Overview Cards */}
+        
+        {/* Overview Cards - Enhanced for Mobile */}
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -268,80 +309,97 @@ export default function Dashboard() {
           className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mb-4 sm:mb-6"
         >
           <OverviewCard 
-            title="Total Devices" 
+            title="Devices" 
             value={stats.totalDevices} 
-            icon={<FaDesktop className="text-blue-500" size={16} />}
+            icon={<FaDesktop className="text-blue-500" size={14} />}
             color="blue"
             darkMode={darkMode}
+            trend="up"
           />
           <OverviewCard 
-            title="Total Peripheral" 
+            title="Peripheral" 
             value={stats.totalPeripherals} 
-            icon={<FaPlug className="text-green-500" size={16} />}
+            icon={<FaPlug className="text-green-500" size={14} />}
             color="green"
             darkMode={darkMode}
+            trend="stable"
           />
           <OverviewCard 
-            title="Total Licenses" 
+            title="Licenses" 
             value={stats.totalLicenses} 
-            icon={<FaIdBadge className="text-purple-500" size={16} />}
+            icon={<FaIdBadge className="text-purple-500" size={14} />}
             color="purple"
             darkMode={darkMode}
+            trend="down"
           />
           <OverviewCard 
             title="Perbaikan" 
             value={stats.devicesNeedingRepair} 
-            icon={<FaTools className="text-orange-500" size={16} />}
+            icon={<FaTools className="text-orange-500" size={14} />}
             color="orange"
             darkMode={darkMode}
+            trend="warning"
           />
           <OverviewCard 
             title="Stok Habis" 
             value={stats.zeroStockItems} 
-            icon={<FaBoxOpen className="text-red-500" size={16} />}
+            icon={<FaBoxOpen className="text-red-500" size={14} />}
             color="red"
             darkMode={darkMode}
+            trend="danger"
           />
           <OverviewCard 
-            title="License Warning" 
+            title="License Alert" 
             value={stats.licenseWarnings} 
-            icon={<FaExclamationTriangle className="text-yellow-500" size={16} />}
+            icon={<FaExclamationTriangle className="text-yellow-500" size={14} />}
             color="yellow"
             darkMode={darkMode}
+            trend="warning"
           />
         </motion.div>
 
-        {/* Main Content Grid */}
+        {/* Main Content Grid - Enhanced for Mobile */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
+          
           {/* Left Column */}
           <div className="space-y-3 sm:space-y-4">
-            {/* Device Status Chart */}
+            
+            {/* Device Status Chart - Enhanced for Mobile */}
             <GlassCard darkMode={darkMode} className="p-3 sm:p-4">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-base sm:text-lg font-semibold flex items-center">
-                  <FaChartPie className="mr-2 text-blue-500" size={16} />
+                <h2 className="text-sm sm:text-lg font-semibold flex items-center">
+                  <FaChartPie className="mr-2 text-blue-500" size={14} />
                   Status Perangkat
                 </h2>
-                <span className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">{deviceData.length} perangkat</span>
+                <span className="text-xs text-gray-500 dark:text-gray-400">{deviceData.length} devices</span>
               </div>
-              <div className="flex flex-col sm:flex-row items-center">
-                <PieChart pieData={pieData} />
-                <div className="mt-3 sm:mt-0 sm:ml-4 w-full space-y-2">
+              
+              <div className="flex flex-col items-center">
+                {/* Enhanced Pie Chart for Mobile */}
+                <div className="relative mb-4">
+                  <PieChart pieData={pieData} size={120} />
+                </div>
+                
+                {/* Status Legend - Enhanced for Mobile */}
+                <div className="w-full grid grid-cols-2 gap-2">
                   {pieData.map(s => (
                     <motion.div 
                       key={s.key} 
                       whileHover={{ scale: 1.02 }}
-                      className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                      whileTap={{ scale: 0.98 }}
+                      className="flex items-center p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer"
                     >
-                      <div className="flex items-center">
-                        <span className="text-base mr-2">{s.icon}</span>
-                        <span className="text-xs sm:text-sm">{s.name}</span>
-                      </div>
-                      <div className="flex items-center">
-                        <span className="text-xs sm:text-sm font-medium mr-1 sm:mr-2">{s.value}</span>
-                        <span className={`px-1 sm:px-2 py-0.5 rounded-full text-xs ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}>
-                          {Math.round((s.value / deviceData.length) * 100)}%
-                        </span>
+                      <span className="text-lg mr-2">{s.icon}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium truncate">{s.name}</p>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold">{s.value}</span>
+                          <span className={`px-2 py-0.5 rounded-full text-xs ${
+                            darkMode ? 'bg-gray-700' : 'bg-gray-100'
+                          }`}>
+                            {Math.round((s.value / deviceData.length) * 100)}%
+                          </span>
+                        </div>
                       </div>
                     </motion.div>
                   ))}
@@ -349,35 +407,46 @@ export default function Dashboard() {
               </div>
             </GlassCard>
 
-            {/* Recent Activity */}
+            {/* Recent Activity - Enhanced for Mobile */}
             <GlassCard darkMode={darkMode} className="p-3 sm:p-4">
-              <div className="flex items-center gap-2 mb-4">
-                <FaListUl className="text-blue-500" size={16} />
-                <h2 className="text-base sm:text-lg font-semibold">Aktivitas Terakhir</h2>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <FaListUl className="text-blue-500" size={14} />
+                  <h2 className="text-sm sm:text-lg font-semibold">Aktivitas Terakhir</h2>
+                </div>
+                <button className="text-xs text-blue-500 font-medium">Lihat Semua</button>
               </div>
-              <div className="space-y-2 sm:space-y-3">
+              
+              <div className="space-y-2">
                 {latestActivities.length === 0 ? (
-                  <p className="text-gray-500 dark:text-gray-400 text-center py-3 text-sm">Belum ada aktivitas</p>
+                  <div className="text-center py-4">
+                    <p className="text-gray-500 dark:text-gray-400 text-sm">Belum ada aktivitas</p>
+                  </div>
                 ) : (
                   <AnimatePresence>
                     {latestActivities.map((act, i) => (
                       <motion.div 
                         key={i}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
+                        initial={{ opacity: 0, x: 10 }}
+                        animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: i * 0.1 }}
-                        className="flex items-start p-2 sm:p-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group"
+                        className="flex items-center p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors group"
                       >
-                        <div className="flex-shrink-0 pt-1">
-                          <div className={`h-2 w-2 sm:h-3 sm:w-3 rounded-full ${act.type === 'device' ? 'bg-blue-500' : 'bg-green-500'}`}></div>
-                        </div>
-                        <div className="ml-3 flex-1 min-w-0">
-                          <p className="text-xs sm:text-sm font-medium truncate">{act.text}</p>
-                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                            {act.waktu ? new Date(act.waktu).toLocaleString("id-ID") : "Waktu tidak tersedia"}
+                        <div className={`w-2 h-2 rounded-full mr-3 ${
+                          act.type === 'device' ? 'bg-blue-500' : 'bg-green-500'
+                        }`}></div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium truncate">{act.text}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            {act.waktu ? new Date(act.waktu).toLocaleString("id-ID", {
+                              day: 'numeric',
+                              month: 'short',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            }) : "Waktu tidak tersedia"}
                           </p>
                         </div>
-                        <FaChevronRight className="text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors self-center flex-shrink-0" size={12} />
+                        <FaChevronRight className="text-gray-400 text-xs" />
                       </motion.div>
                     ))}
                   </AnimatePresence>
@@ -388,46 +457,54 @@ export default function Dashboard() {
 
           {/* Right Column */}
           <div className="space-y-3 sm:space-y-4">
-            {/* Notifications */}
+            
+            {/* Notifications - Enhanced for Mobile */}
             <GlassCard darkMode={darkMode} className="p-3 sm:p-4">
-              <div className="flex items-center gap-2 mb-4">
-                <FaBell className="text-yellow-500" size={16} />
-                <h2 className="text-base sm:text-lg font-semibold">Notifikasi</h2>
-                {(notifPerluPerbaikan || notifLicenseWarning || notifPeripheralHabis) && (
-                  <motion.span 
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className="px-2 py-0.5 bg-red-500 text-white text-xs rounded-full"
-                  >
-                    {[notifPerluPerbaikan, notifLicenseWarning, notifPeripheralHabis].filter(Boolean).length}
-                  </motion.span>
-                )}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <FaBell className="text-yellow-500" size={14} />
+                  <h2 className="text-sm sm:text-lg font-semibold">Notifikasi</h2>
+                  {(notifPerluPerbaikan || notifLicenseWarning || notifPeripheralHabis) && (
+                    <motion.span 
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className="px-2 py-0.5 bg-red-500 text-white text-xs rounded-full"
+                    >
+                      {[notifPerluPerbaikan, notifLicenseWarning, notifPeripheralHabis].filter(Boolean).length}
+                    </motion.span>
+                  )}
+                </div>
+                <button className="text-xs text-blue-500 font-medium">Clear All</button>
               </div>
+              
               <div className="space-y-3">
                 {notifPerluPerbaikan && (
                   <NotificationItem 
                     type="warning"
-                    title="Device perlu perbaikan"
+                    title="⚠️ Perlu Perbaikan"
                     content={notifPerluPerbaikan}
                     darkMode={darkMode}
+                    time="Baru saja"
                   />
                 )}
                 
                 {notifLicenseWarning && (
                   <NotificationItem 
                     type="danger"
-                    title="License hampir habis"
+                    title="🔴 License Warning"
                     content={notifLicenseWarning}
                     darkMode={darkMode}
+                    time="1 jam lalu"
                   />
                 )}
                 
                 {notifPeripheralHabis && (
                   <NotificationItem 
                     type="info"
-                    title="Peripheral stok habis"
+                    title="🔵 Stok Habis"
                     content={notifPeripheralHabis}
                     darkMode={darkMode}
+                    time="2 jam lalu"
                   />
                 )}
                 
@@ -435,89 +512,148 @@ export default function Dashboard() {
                   <motion.div 
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    className="text-center py-4 sm:py-6"
+                    className="text-center py-6"
                   >
-                    <div className="text-2xl sm:text-4xl mb-1 sm:mb-2">🎉</div>
-                    <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Tidak ada notifikasi</p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500">Semua sistem berjalan normal</p>
+                    <div className="text-4xl mb-2">🎉</div>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Tidak ada notifikasi</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Semua sistem berjalan normal</p>
                   </motion.div>
                 )}
               </div>
             </GlassCard>
 
-            {/* Quick Actions */}
+            {/* Quick Actions - Enhanced for Mobile */}
             <GlassCard darkMode={darkMode} className="p-3 sm:p-4">
-              <h2 className="text-base sm:text-lg font-semibold mb-4">Akses Cepat</h2>
-              <div className="grid grid-cols-2 gap-2 sm:gap-3">
+              <h2 className="text-sm sm:text-lg font-semibold mb-4">Akses Cepat</h2>
+              <div className="grid grid-cols-2 gap-3">
                 <QuickActionButton 
                   title="Devices"
-                  icon={<FaDesktop size={14} />}
+                  icon={<FaDesktop size={16} />}
                   onClick={() => navigate("/devices")}
                   color="blue"
                   darkMode={darkMode}
+                  subtitle="Manage devices"
                 />
                 <QuickActionButton 
                   title="Peripheral"
-                  icon={<FaPlug size={14} />}
+                  icon={<FaPlug size={16} />}
                   onClick={() => navigate("/peripheral")}
                   color="green"
                   darkMode={darkMode}
+                  subtitle="Stock management"
                 />
                 <QuickActionButton 
                   title="Licenses"
-                  icon={<FaIdBadge size={14} />}
+                  icon={<FaIdBadge size={16} />}
                   onClick={() => navigate("/licenses")}
                   color="purple"
                   darkMode={darkMode}
+                  subtitle="License overview"
                 />
                 <QuickActionButton 
                   title="Helpdesk"
-                  icon={<FaTools size={14} />}
+                  icon={<FaTools size={16} />}
                   onClick={() => navigate("/helpdesk/entry")}
                   color="orange"
                   darkMode={darkMode}
+                  subtitle="Support tickets"
                 />
               </div>
             </GlassCard>
           </div>
         </div>
       </div>
+
+      {/* Mobile Bottom Navigation */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-2">
+        <div className="grid grid-cols-4 gap-1">
+          {[
+            { icon: FaDesktop, label: "Devices", path: "/devices" },
+            { icon: FaPlug, label: "Peripheral", path: "/peripheral" },
+            { icon: FaIdBadge, label: "Licenses", path: "/licenses" },
+            { icon: FaTools, label: "Helpdesk", path: "/helpdesk/entry" }
+          ].map((item, index) => (
+            <button
+              key={index}
+              onClick={() => navigate(item.path)}
+              className="flex flex-col items-center p-2 rounded-lg text-xs transition-colors"
+            >
+              <item.icon size={16} className="mb-1" />
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
 
-// --- Overview Card Component
-function OverviewCard({ title, value, icon, color, darkMode }) {
+// Enhanced Overview Card Component with Trend Indicator
+function OverviewCard({ title, value, icon, color, darkMode, trend }) {
   const colorClasses = {
-    blue: { bg: 'bg-blue-100', text: 'text-blue-600', darkBg: 'bg-blue-900/20', darkText: 'text-blue-400' },
-    green: { bg: 'bg-green-100', text: 'text-green-600', darkBg: 'bg-green-900/20', darkText: 'text-green-400' },
-    purple: { bg: 'bg-purple-100', text: 'text-purple-600', darkBg: 'bg-purple-900/20', darkText: 'text-purple-400' },
-    orange: { bg: 'bg-orange-100', text: 'text-orange-600', darkBg: 'bg-orange-900/20', darkText: 'text-orange-400' },
-    red: { bg: 'bg-red-100', text: 'text-red-600', darkBg: 'bg-red-900/20', darkText: 'text-red-400' },
-    yellow: { bg: 'bg-yellow-100', text: 'text-yellow-600', darkBg: 'bg-yellow-900/20', darkText: 'text-yellow-400' }
+    blue: { 
+      bg: 'bg-blue-100', text: 'text-blue-600', darkBg: 'bg-blue-900/20', darkText: 'text-blue-400',
+      gradient: 'from-blue-500 to-blue-600'
+    },
+    green: { 
+      bg: 'bg-green-100', text: 'text-green-600', darkBg: 'bg-green-900/20', darkText: 'text-green-400',
+      gradient: 'from-green-500 to-green-600'
+    },
+    purple: { 
+      bg: 'bg-purple-100', text: 'text-purple-600', darkBg: 'bg-purple-900/20', darkText: 'text-purple-400',
+      gradient: 'from-purple-500 to-purple-600'
+    },
+    orange: { 
+      bg: 'bg-orange-100', text: 'text-orange-600', darkBg: 'bg-orange-900/20', darkText: 'text-orange-400',
+      gradient: 'from-orange-500 to-orange-600'
+    },
+    red: { 
+      bg: 'bg-red-100', text: 'text-red-600', darkBg: 'bg-red-900/20', darkText: 'text-red-400',
+      gradient: 'from-red-500 to-red-600'
+    },
+    yellow: { 
+      bg: 'bg-yellow-100', text: 'text-yellow-600', darkBg: 'bg-yellow-900/20', darkText: 'text-yellow-400',
+      gradient: 'from-yellow-500 to-yellow-600'
+    }
+  };
+
+  const trendIcons = {
+    up: "↗️",
+    down: "↘️",
+    stable: "→",
+    warning: "⚠️",
+    danger: "🔴"
   };
 
   return (
     <motion.div 
-      whileHover={{ scale: 1.05, y: -5 }}
-      className={`p-2 sm:p-3 rounded-lg sm:rounded-xl shadow-sm transition-all duration-300 ${
+      whileHover={{ scale: 1.05, y: -2 }}
+      whileTap={{ scale: 0.95 }}
+      className={`relative p-3 rounded-xl shadow-sm transition-all duration-300 overflow-hidden ${
         darkMode 
           ? `bg-gray-800 hover:bg-gray-750 ${colorClasses[color].darkBg}` 
           : `bg-white hover:bg-gray-50 ${colorClasses[color].bg}`
       }`}
     >
-      <div className="flex items-center justify-between">
+      {/* Background Gradient */}
+      <div className={`absolute inset-0 bg-gradient-to-r ${colorClasses[color].gradient} opacity-5`}></div>
+      
+      <div className="relative flex items-center justify-between">
         <div>
-          <p className={`text-xs sm:text-sm font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+          <p className={`text-xs font-medium ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
             {title}
           </p>
-          <p className={`text-lg sm:text-xl font-bold ${darkMode ? colorClasses[color].darkText : colorClasses[color].text}`}>
+          <p className={`text-xl font-bold ${darkMode ? colorClasses[color].darkText : colorClasses[color].text}`}>
             {value}
           </p>
+          <div className="flex items-center mt-1">
+            <span className="text-xs">{trendIcons[trend]}</span>
+            <span className="text-xs ml-1 text-gray-500">vs kemarin</span>
+          </div>
         </div>
         <motion.div 
-          whileHover={{ rotate: 10 }}
-          className={`p-1 sm:p-2 rounded-full ${darkMode ? 'bg-gray-700' : 'bg-white'}`}
+          whileHover={{ rotate: 15, scale: 1.1 }}
+          className={`p-2 rounded-full ${darkMode ? 'bg-gray-700' : 'bg-white'} shadow-sm`}
         >
           {icon}
         </motion.div>
@@ -526,8 +662,8 @@ function OverviewCard({ title, value, icon, color, darkMode }) {
   );
 }
 
-// --- Notification Item Component
-function NotificationItem({ type, title, content, darkMode }) {
+// Enhanced Notification Item Component
+function NotificationItem({ type, title, content, darkMode, time }) {
   const typeStyles = {
     warning: {
       icon: '🟠',
@@ -556,48 +692,69 @@ function NotificationItem({ type, title, content, darkMode }) {
       className={`p-3 rounded-lg border ${typeStyles[type].bg} ${typeStyles[type].border}`}
     >
       <div className="flex items-start">
-        <span className="text-lg mr-2">{typeStyles[type].icon}</span>
+        <span className="text-lg mr-3">{typeStyles[type].icon}</span>
         <div className="flex-1 min-w-0">
-          <p className={`font-medium text-sm ${typeStyles[type].text}`}>{title}</p>
-          <p className="mt-1 text-xs text-gray-600 dark:text-gray-300 truncate">{content}</p>
+          <div className="flex items-center justify-between">
+            <p className={`font-medium text-sm ${typeStyles[type].text}`}>{title}</p>
+            <span className="text-xs text-gray-500">{time}</span>
+          </div>
+          <p className="mt-1 text-xs text-gray-600 dark:text-gray-300 line-clamp-2">{content}</p>
         </div>
       </div>
     </motion.div>
   );
 }
 
-// --- Quick Action Button Component
-function QuickActionButton({ title, icon, onClick, color, darkMode }) {
+// Enhanced Quick Action Button Component
+function QuickActionButton({ title, icon, onClick, color, darkMode, subtitle }) {
   const colorClasses = {
-    blue: { bg: 'bg-blue-500', hover: 'hover:bg-blue-600' },
-    green: { bg: 'bg-green-500', hover: 'hover:bg-green-600' },
-    purple: { bg: 'bg-purple-500', hover: 'hover:bg-purple-600' },
-    orange: { bg: 'bg-orange-500', hover: 'hover:bg-orange-600' }
+    blue: { 
+      bg: 'bg-blue-500', hover: 'hover:bg-blue-600',
+      gradient: 'from-blue-500 to-blue-600'
+    },
+    green: { 
+      bg: 'bg-green-500', hover: 'hover:bg-green-600',
+      gradient: 'from-green-500 to-green-600'
+    },
+    purple: { 
+      bg: 'bg-purple-500', hover: 'hover:bg-purple-600',
+      gradient: 'from-purple-500 to-purple-600'
+    },
+    orange: { 
+      bg: 'bg-orange-500', hover: 'hover:bg-orange-600',
+      gradient: 'from-orange-500 to-orange-600'
+    }
   };
 
   return (
     <motion.button
-      whileHover={{ scale: 1.05 }}
+      whileHover={{ scale: 1.05, y: -2 }}
       whileTap={{ scale: 0.95 }}
       onClick={onClick}
-      className={`p-2 sm:p-3 rounded-lg text-white ${colorClasses[color].bg} ${colorClasses[color].hover} transition-colors duration-200 flex flex-col items-center justify-center`}
+      className={`p-3 rounded-xl text-white bg-gradient-to-r ${colorClasses[color].gradient} shadow-lg transition-all duration-200 flex flex-col items-center justify-center relative overflow-hidden`}
     >
-      <div className="text-lg sm:text-xl mb-1 sm:mb-2">{icon}</div>
-      <span className="text-xs sm:text-sm font-medium">{title}</span>
+      {/* Shine effect */}
+      <div className="absolute inset-0 bg-white/10 transform -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500"></div>
+      
+      <div className="text-2xl mb-2 relative z-10">{icon}</div>
+      <span className="text-sm font-medium relative z-10">{title}</span>
+      {subtitle && (
+        <span className="text-xs opacity-90 mt-1 relative z-10">{subtitle}</span>
+      )}
     </motion.button>
   );
 }
 
-// --- Pie Chart Custom dengan Tooltip
-function PieChart({ pieData }) {
+// Enhanced Pie Chart Component
+function PieChart({ pieData, size = 100 }) {
   const [activeIndex, setActiveIndex] = useState(null);
   const total = pieData.reduce((sum, s) => sum + s.value, 0) || 1;
   let cumulative = 0;
-  const radius = 40, cx = 50, cy = 50;
+  const radius = size * 0.4, cx = size / 2, cy = size / 2;
   
   return (
     <div className="relative">
-      <svg width={100} height={100} viewBox="0 0 100 100" className="flex-shrink-0">
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="flex-shrink-0">
         {pieData.map((s, i) => {
           if (s.value === 0) return null;
           
@@ -629,25 +786,33 @@ function PieChart({ pieData }) {
           );
         })}
         <circle cx={cx} cy={cy} r={radius} fill="none" stroke="#e5e7eb" strokeWidth={2} />
-        <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle" fontSize="12" fontWeight="bold" fill="currentColor">
+        <text 
+          x={cx} 
+          y={cy} 
+          textAnchor="middle" 
+          dominantBaseline="middle" 
+          fontSize={size * 0.12} 
+          fontWeight="bold" 
+          fill="currentColor"
+        >
           {total}
         </text>
       </svg>
       
-      {/* Tooltip untuk pie chart */}
+      {/* Enhanced Tooltip */}
       {activeIndex !== null && (
         <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="absolute bg-gray-900 text-white p-2 rounded-lg text-xs shadow-lg z-10 hidden sm:block"
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="absolute bg-gray-900 text-white p-2 rounded-lg text-xs shadow-xl z-10"
           style={{ 
-            top: 0, 
-            left: 110,
+            top: '50%', 
+            left: size + 10,
             transform: 'translateY(-50%)'
           }}
         >
           <div className="font-semibold">{pieData[activeIndex].name}</div>
-          <div>{pieData[activeIndex].value} perangkat</div>
+          <div>{pieData[activeIndex].value} devices</div>
           <div>{Math.round((pieData[activeIndex].value / total) * 100)}%</div>
         </motion.div>
       )}
