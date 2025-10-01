@@ -552,7 +552,7 @@ export default function ChatHost() {
       } else {
         setIsTyping(true);
         setTimeout(() => {
-          pushBot(<span>Oke, silakan tambahkan keluhanmu.</span>);
+          pushBot(<span>Oke, silakan tulis ulang keluhanmu.</span>);
           setStage("needComplaint");
           setIsTyping(false);
         }, 250);

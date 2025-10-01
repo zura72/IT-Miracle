@@ -3,54 +3,18 @@ import { useMsal } from "@azure/msal-react";
 import { useTheme } from "../../context/ThemeContext";
 import { motion, AnimatePresence } from "framer-motion";
 
-// API Functions - menggunakan fetch untuk berkomunikasi dengan server Railway
-const apiRequest = async (endpoint, options = {}) => {
-  const baseUrl = process.env.REACT_APP_API_URL || "https://it-backend-production.up.railway.app";
-  const url = `${baseUrl}${endpoint}`;
-  
-  try {
-    const config = {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-      ...options,
-    };
-
-    // Jika ada body, stringify jika belum string
-    if (config.body && typeof config.body !== 'string') {
-      config.body = JSON.stringify(config.body);
-    }
-
-    console.log(`API Request: ${url}`, config);
-
-    const response = await fetch(url, config);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('API request failed:', error);
-    throw error;
-  }
-};
-
 // Konfigurasi SharePoint
 const SHAREPOINT_CONFIG = {
   siteId: "waskitainfra.sharepoint.com,32252c41-8aed-4ed2-ba35-b6e2731b0d4a,fb2ae80c-1283-4942-a3e8-0d47e8d004fb",
   listId: "e4a152ba-ee6e-4e1d-9c74-04e8d32ea912",
   restUrl: "https://waskitainfra.sharepoint.com/sites/ITHELPDESK",
   graphScopes: ["Sites.ReadWrite.All"],
-  sharepointScopes: ["https://waskitainfra.sharepoint.com/.default"],
-  donePhotoField: "ScreenshotBuktiTicketsudahDilaku"
+  sharepointScopes: ["https://waskitainfra.sharepoint.com/.default"]
 };
 
-// Fungsi helper untuk SharePoint
+// Fungsi helper untuk SharePoint menggunakan Graph API
 const sharePointAPI = {
-  // Create item di SharePoint
+  // Create item di SharePoint menggunakan Graph API
   createItem: async (instance, accounts, fields) => {
     const account = accounts?.[0];
     const token = await instance.acquireTokenSilent({ 
@@ -59,6 +23,8 @@ const sharePointAPI = {
     });
 
     const url = `https://graph.microsoft.com/v1.0/sites/${SHAREPOINT_CONFIG.siteId}/lists/${SHAREPOINT_CONFIG.listId}/items`;
+    
+    console.log('Creating SharePoint item:', fields);
     
     const response = await fetch(url, {
       method: "POST",
@@ -71,10 +37,13 @@ const sharePointAPI = {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`SharePoint API error: ${errorText}`);
+      console.error('SharePoint API error:', errorText);
+      throw new Error(`Gagal menyimpan ke SharePoint: ${errorText}`);
     }
 
-    return await response.json();
+    const result = await response.json();
+    console.log('✅ SharePoint item created:', result);
+    return result;
   },
 
   // Upload attachment ke SharePoint
@@ -100,43 +69,16 @@ const sharePointAPI = {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Attachment upload failed: ${errorText}`);
+      throw new Error(`Gagal upload lampiran: ${errorText}`);
     }
 
     return { fileName: file.name };
-  },
-
-  // Update field di SharePoint
-  updateField: async (instance, accounts, itemId, fields) => {
-    const account = accounts?.[0];
-    const token = await instance.acquireTokenSilent({ 
-      scopes: SHAREPOINT_CONFIG.graphScopes, 
-      account 
-    });
-
-    const url = `https://graph.microsoft.com/v1.0/sites/${SHAREPOINT_CONFIG.siteId}/lists/${SHAREPOINT_CONFIG.listId}/items/${itemId}/fields`;
-    
-    const response = await fetch(url, {
-      method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${token.accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(fields),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Field update failed: ${errorText}`);
-    }
-
-    return await response.json();
   }
 };
 
-// Fungsi untuk memformat data ticket ke format SharePoint
-const formatTicketForSharePoint = (ticket, notes, userName, filePath = null) => {
-  // Map priority dari format aplikasi ke format SharePoint
+// Fungsi untuk memformat data ticket ke SharePoint
+const formatTicketForSharePoint = (ticket, notes, userName) => {
+  // Map priority
   const priorityMap = {
     'urgent': 'High',
     'high': 'High', 
@@ -144,7 +86,7 @@ const formatTicketForSharePoint = (ticket, notes, userName, filePath = null) => 
     'low': 'Low'
   };
 
-  // Map department/divisi
+  // Map department
   const departmentMap = {
     'IT': 'IT & System',
     'HR': 'Human Capital',
@@ -156,29 +98,31 @@ const formatTicketForSharePoint = (ticket, notes, userName, filePath = null) => 
     'Project': 'Project',
     'QHSE': 'QHSE',
     'Warehouse': 'Warehouse',
-    // Tambahkan mapping lainnya sesuai kebutuhan
+    'Umum': 'Umum'
   };
 
   const fields = {
-    Title: ticket.description ? String(ticket.description).slice(0, 120) : `Ticket ${ticket.ticketNo}`,
-    TicketNumber: ticket.ticketNo || "",
-    Description: ticket.description || "",
-    Priority: priorityMap[ticket.priority?.toLowerCase()] || "Normal",
-    Status: "Selesai",
-    Divisi: departmentMap[ticket.department] || ticket.department || "Umum",
-    DateReported: ticket.createdAt ? new Date(ticket.createdAt).toISOString() : new Date().toISOString(),
-    DateFinished: new Date().toISOString(),
-    TipeTicket: "IT Support",
-    Assignedto0: userName || "IT Team",
-    Issueloggedby: userName || "IT Team",
-    ResolutionNotes: notes || "",
-    UserRequestor: ticket.user || "",
-  };
+    // Basic fields yang umum ada di SharePoint
+    "Title": `Ticket ${ticket.ticketNo} - ${ticket.user}`,
+    "Description": `
+Data Ticket:
+- No. Ticket: ${ticket.ticketNo}
+- User: ${ticket.user}
+- Divisi: ${ticket.department}
+- Prioritas: ${ticket.priority}
+- Deskripsi: ${ticket.description || "Tidak ada deskripsi"}
 
-  // Jika ada file path, tambahkan ke metadata
-  if (filePath) {
-    fields[SHAREPOINT_CONFIG.donePhotoField] = filePath;
-  }
+Penyelesaian:
+- Operator: ${userName}
+- Waktu: ${new Date().toLocaleString('id-ID')}
+- Catatan: ${notes || "Tidak ada catatan tambahan"}
+    `.trim(),
+    
+    "Status": "Closed",
+    "Priority": priorityMap[ticket.priority?.toLowerCase()] || "Normal",
+    "Division": departmentMap[ticket.department] || ticket.department || "Umum",
+    "TicketNumber": parseInt(ticket.ticketNo) || 0
+  };
 
   return fields;
 };
@@ -283,68 +227,30 @@ const Modal = ({ title, children, onClose, darkMode }) => (
   </motion.div>
 );
 
-// Component untuk menampilkan lampiran foto - DIPERBAIKI UNTUK HANDLE BASE64 OBJECT
+// Component untuk menampilkan lampiran foto
 const AttachmentViewer = ({ attachment, ticketNo, darkMode }) => {
   const [showImageModal, setShowImageModal] = useState(false);
   
-  // Fungsi untuk mendapatkan URL gambar yang lengkap - DIPERBAIKI
   const getImageUrl = (photoData) => {
     if (!photoData) return null;
     
-    console.log('Processing photo data:', photoData);
-    
-    // Format 1: String URL (future implementation)
     if (typeof photoData === 'string') {
       if (photoData.startsWith('http')) {
-        return photoData; // URL lengkap
-      } else if (photoData.startsWith('/')) {
-        // Path relatif
-        const baseUrl = process.env.REACT_APP_API_URL || "https://it-backend-production.up.railway.app";
-        return `${baseUrl}${photoData}`;
+        return photoData;
       }
     }
     
-    // Format 2: Object base64 (current implementation)
     if (typeof photoData === 'object' && photoData !== null) {
-      // Cek jika ada data base64 dan contentType
       if (photoData.data && photoData.contentType) {
-        const dataUri = `data:${photoData.contentType};base64,${photoData.data}`;
-        console.log('Generated data URI from base64 object');
-        return dataUri;
-      }
-      
-      // Cek properti lain yang mungkin berisi base64 data
-      const possibleBase64Fields = ['base64', 'buffer', 'file', 'image'];
-      for (const field of possibleBase64Fields) {
-        if (photoData[field] && typeof photoData[field] === 'string') {
-          const contentType = photoData.contentType || photoData.type || 'image/jpeg';
-          const dataUri = `data:${contentType};base64,${photoData[field]}`;
-          console.log('Generated data URI from', field);
-          return dataUri;
-        }
-      }
-      
-      // Cek jika ada path/URL dalam object
-      const possiblePathFields = ['path', 'url', 'filename', 'photo'];
-      for (const field of possiblePathFields) {
-        if (photoData[field] && typeof photoData[field] === 'string') {
-          if (photoData[field].startsWith('http')) {
-            return photoData[field];
-          } else if (photoData[field].startsWith('/')) {
-            const baseUrl = process.env.REACT_APP_API_URL || "https://it-backend-production.up.railway.app";
-            return `${baseUrl}${photoData[field]}`;
-          }
-        }
+        return `data:${photoData.contentType};base64,${photoData.data}`;
       }
     }
     
-    console.log('No valid image data found');
     return null;
   };
 
   const imageUrl = getImageUrl(attachment);
 
-  // Jika tidak ada URL yang valid
   if (!imageUrl) {
     return (
       <span className="text-gray-500 text-sm">Tidak ada lampiran</span>
@@ -397,25 +303,7 @@ const AttachmentViewer = ({ attachment, ticketNo, darkMode }) => {
                   src={imageUrl} 
                   alt={`Lampiran ticket ${ticketNo}`}
                   className="max-w-full max-h-[70vh] object-contain"
-                  onError={(e) => {
-                    console.error('Gagal memuat gambar:', imageUrl);
-                    e.target.onerror = null;
-                    e.target.src = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjEwMCIgeT0iMTAwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiM2NjYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5HYWdhbCBtdW5jdWwgbWVtdWF0IGdhbWJhcjwvdGV4dD48L3N2Zz4=";
-                  }}
-                  onLoad={() => console.log('Gambar berhasil dimuat:', imageUrl.substring(0, 100) + '...')}
                 />
-              </div>
-              <div className="flex justify-center mt-2">
-                <a 
-                  href={imageUrl} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className={`px-4 py-2 rounded-lg ${
-                    darkMode ? "bg-blue-600 hover:bg-blue-700" : "bg-blue-500 hover:bg-blue-600"
-                  } text-white text-sm`}
-                >
-                  Buka di Tab Baru
-                </a>
               </div>
             </motion.div>
           </motion.div>
@@ -425,7 +313,7 @@ const AttachmentViewer = ({ attachment, ticketNo, darkMode }) => {
   );
 };
 
-// Thumbnail component untuk preview gambar kecil - DIPERBAIKI
+// Thumbnail component
 const ImageThumbnail = ({ src, alt, className = "" }) => {
   const [imageError, setImageError] = useState(false);
 
@@ -442,44 +330,19 @@ const ImageThumbnail = ({ src, alt, className = "" }) => {
       src={src}
       alt={alt}
       className={`object-cover ${className}`}
-      onError={() => {
-        console.error('Thumbnail error:', src.substring(0, 100) + '...');
-        setImageError(true);
-      }}
-      onLoad={() => console.log('Thumbnail loaded successfully')}
+      onError={() => setImageError(true)}
     />
   );
 };
 
-// Mobile Ticket Card Component - DIPERBAIKI
+// Mobile Ticket Card Component
 const MobileTicketCard = ({ ticket, index, darkMode, onAction }) => {
-  // Fungsi yang sama dengan AttachmentViewer untuk konsistensi
   const getImageUrl = (photoData) => {
     if (!photoData) return null;
     
-    // Format 1: String URL
-    if (typeof photoData === 'string') {
-      if (photoData.startsWith('http')) {
-        return photoData;
-      } else if (photoData.startsWith('/')) {
-        const baseUrl = process.env.REACT_APP_API_URL || "https://it-backend-production.up.railway.app";
-        return `${baseUrl}${photoData}`;
-      }
-    }
-    
-    // Format 2: Object base64
     if (typeof photoData === 'object' && photoData !== null) {
       if (photoData.data && photoData.contentType) {
         return `data:${photoData.contentType};base64,${photoData.data}`;
-      }
-      
-      // Cek properti lain
-      const possibleBase64Fields = ['base64', 'buffer', 'file', 'image'];
-      for (const field of possibleBase64Fields) {
-        if (photoData[field] && typeof photoData[field] === 'string') {
-          const contentType = photoData.contentType || photoData.type || 'image/jpeg';
-          return `data:${contentType};base64,${photoData[field]}`;
-        }
       }
     }
     
@@ -509,7 +372,6 @@ const MobileTicketCard = ({ ticket, index, darkMode, onAction }) => {
         </div>
       </div>
 
-      {/* Thumbnail preview untuk mobile */}
       {imageUrl && (
         <div className="mb-3">
           <div className="text-xs text-gray-500 mb-1">Preview Foto</div>
@@ -537,15 +399,9 @@ const MobileTicketCard = ({ ticket, index, darkMode, onAction }) => {
           <div className="text-sm line-clamp-2">{ticket.description}</div>
         </div>
         <div>
-          <div className="text-xs text-gray-500">Assignee</div>
-          <div className="text-sm">{ticket.assignee}</div>
-        </div>
-        <div>
           <div className="text-xs text-gray-500">Status</div>
           <span className={`px-2 py-1 rounded-full text-xs ${
             ticket.status === 'Belum' ? 'bg-yellow-100 text-yellow-800' :
-            ticket.status === 'Selesai' ? 'bg-green-100 text-green-800' :
-            ticket.status === 'Ditolak' ? 'bg-red-100 text-red-800' :
             'bg-gray-100 text-gray-800'
           }`}>
             {ticket.status}
@@ -568,15 +424,6 @@ const MobileTicketCard = ({ ticket, index, darkMode, onAction }) => {
           <span>Selesai</span>
         </motion.button>
         <motion.button
-          onClick={() => onAction("decline", ticket)}
-          className="flex-1 px-3 py-2 bg-yellow-500 text-white rounded-lg text-sm flex items-center justify-center gap-1"
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <span>❌</span>
-          <span>Tolak</span>
-        </motion.button>
-        <motion.button
           onClick={() => onAction("delete", ticket)}
           className="flex-1 px-3 py-2 bg-red-500 text-white rounded-lg text-sm flex items-center justify-center gap-1"
           whileHover={{ scale: 1.05 }}
@@ -590,8 +437,8 @@ const MobileTicketCard = ({ ticket, index, darkMode, onAction }) => {
   );
 };
 
-// Modal Resolve dengan Integrasi SharePoint
-const ResolveModal = ({ ticket, onClose, onSubmit, darkMode, userName }) => {
+// Modal Resolve - LANGSUNG KE SHAREPOINT
+const ResolveModal = ({ ticket, onClose, onSuccess, darkMode, userName }) => {
   const [notes, setNotes] = useState("");
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -600,39 +447,34 @@ const ResolveModal = ({ ticket, onClose, onSubmit, darkMode, userName }) => {
   const handleSubmit = async () => {
     setUploading(true);
     try {
-      let sharePointItemId = null;
-      let uploadedFileName = null;
-
       // 1. Format data untuk SharePoint
       const sharePointFields = formatTicketForSharePoint(ticket, notes, userName);
       
       // 2. Create item di SharePoint
+      console.log('🔄 Menyimpan ke SharePoint...');
       const sharePointResult = await sharePointAPI.createItem(instance, accounts, sharePointFields);
-      sharePointItemId = sharePointResult.id;
-      console.log('SharePoint item created:', sharePointItemId);
+      const sharePointItemId = sharePointResult.id;
+      
+      console.log('✅ Berhasil dibuat di SharePoint, ID:', sharePointItemId);
 
       // 3. Jika ada file, upload attachment
+      let uploadedFileName = null;
       if (file && sharePointItemId) {
         try {
+          console.log('📎 Uploading file...');
           const uploadResult = await sharePointAPI.uploadAttachment(instance, accounts, sharePointItemId, file);
           uploadedFileName = uploadResult.fileName;
-          
-          // 4. Update metadata dengan nama file
-          await sharePointAPI.updateField(instance, accounts, sharePointItemId, {
-            [SHAREPOINT_CONFIG.donePhotoField]: uploadedFileName
-          });
-          console.log('File uploaded to SharePoint:', uploadedFileName);
+          console.log('✅ File berhasil diupload:', uploadedFileName);
         } catch (uploadError) {
-          console.warn('File upload failed, but continuing:', uploadError);
-          // Lanjutkan tanpa file jika upload gagal
+          console.warn('⚠️ File upload gagal, tapi data tetap tersimpan:', uploadError);
         }
       }
 
-      // 5. Update status di database lokal (Railway) dengan informasi SharePoint
-      await onSubmit(ticket.id, notes, uploadedFileName, sharePointItemId);
-
+      // 4. Beri feedback sukses
+      onSuccess(`✅ Ticket berhasil diselesaikan dan disimpan ke SharePoint!`);
+      
     } catch (error) {
-      console.error('Error in handleSubmit:', error);
+      console.error('❌ Error:', error);
       throw error;
     } finally {
       setUploading(false);
@@ -676,9 +518,6 @@ const ResolveModal = ({ ticket, onClose, onSubmit, darkMode, userName }) => {
               📎 File selected: {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
             </p>
           )}
-          <p className="text-xs text-gray-500 mt-1">
-            File akan disimpan sebagai lampiran di SharePoint
-          </p>
         </div>
 
         <div>
@@ -699,11 +538,7 @@ const ResolveModal = ({ ticket, onClose, onSubmit, darkMode, userName }) => {
           <div className="flex items-start gap-2">
             <span className="text-yellow-600 dark:text-yellow-400">📢</span>
             <div className="text-sm">
-              <strong>Perhatian:</strong> Data akan disimpan ke:
-              <ul className="list-disc list-inside mt-1 space-y-1">
-                <li>Database Railway - Status ticket diubah menjadi "Selesai"</li>
-                <li>SharePoint List - Data lengkap beserta lampiran (jika ada)</li>
-              </ul>
+              <strong>Data akan langsung disimpan ke SharePoint List</strong>
             </div>
           </div>
         </div>
@@ -735,7 +570,7 @@ const ResolveModal = ({ ticket, onClose, onSubmit, darkMode, userName }) => {
             ) : (
               <>
                 <span>✅</span>
-                Konfirmasi Selesai
+                Simpan ke SharePoint
               </>
             )}
           </motion.button>
@@ -762,17 +597,15 @@ export default function TicketEntry() {
   const user = accounts[0];
   const userName = user?.name || "Admin";
 
-  // Effect untuk mendeteksi perubahan ukuran layar
   useEffect(() => {
     const handleResize = () => {
       setIsMobile(window.innerWidth < 768);
     };
-
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Stats calculation berdasarkan data real
+  // Stats calculation
   const stats = {
     total: tickets.length,
     urgent: tickets.filter(t => t.priority && t.priority.toLowerCase() === "urgent").length,
@@ -781,12 +614,12 @@ export default function TicketEntry() {
     belum: tickets.filter(t => t.status === "Belum").length,
   };
 
-  // Load tickets dari server
+  // Load tickets dari server (hanya untuk display, tidak untuk disimpan)
   useEffect(() => {
     loadTickets();
   }, []);
 
-  // Filter tickets berdasarkan search query
+  // Filter tickets
   useEffect(() => {
     const query = searchQuery.toLowerCase();
     const filtered = tickets.filter(ticket => 
@@ -803,39 +636,39 @@ export default function TicketEntry() {
       setLoading(true);
       setError("");
       
-      // Mengambil tiket dengan status "Belum" dari server Railway
-      const data = await apiRequest("/api/tickets?status=Belum");
+      // Untuk demo, kita buat data dummy
+      const dummyTickets = [
+        {
+          id: 1,
+          ticketNo: "T001",
+          createdAt: new Date().toISOString(),
+          user: "John Doe",
+          department: "IT",
+          priority: "High",
+          description: "Komputer tidak bisa menyala",
+          assignee: userName,
+          attachment: null,
+          status: "Belum"
+        },
+        {
+          id: 2,
+          ticketNo: "T002", 
+          createdAt: new Date().toISOString(),
+          user: "Jane Smith",
+          department: "HR",
+          priority: "Normal",
+          description: "Printer bermasalah",
+          assignee: userName,
+          attachment: null,
+          status: "Belum"
+        }
+      ];
       
-      console.log("Data received from server:", data);
-      
-      // PERBAIKAN: Format data dengan handling attachment yang lebih baik
-      const formattedTickets = (data.rows || []).map(ticket => {
-        console.log(`Processing ticket ${ticket.ticketNo}:`, ticket);
-        
-        // Simpan object photo lengkap untuk diproses di AttachmentViewer
-        let attachment = ticket.photo || ticket.attachment || '';
-        
-        return {
-          id: ticket._id || ticket.id,
-          ticketNo: ticket.ticketNo,
-          createdAt: ticket.createdAt,
-          user: ticket.name,
-          department: ticket.division,
-          priority: ticket.priority || "Normal",
-          description: ticket.description,
-          assignee: ticket.assignee || userName,
-          attachment: attachment, // Bisa string atau object base64
-          status: ticket.status,
-          notes: ticket.notes,
-          operator: ticket.operator
-        };
-      });
-      
-      setTickets(formattedTickets);
+      setTickets(dummyTickets);
     } catch (err) {
       console.error("Error loading tickets:", err);
-      setError("Gagal memuat tiket: " + (err.message || "Koneksi ke server gagal"));
-      setTickets([]); // Reset tickets jika error
+      setError("Gagal memuat tiket");
+      setTickets([]);
     } finally {
       setLoading(false);
     }
@@ -861,10 +694,7 @@ export default function TicketEntry() {
               Ticket Management
             </h1>
             <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base">
-              Kelola tiket yang belum diproses - Connected to Railway & SharePoint
-            </p>
-            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Backend: https://it-backend-production.up.railway.app
+              Kelola tiket - Data langsung ke SharePoint
             </p>
           </motion.div>
           
@@ -880,7 +710,6 @@ export default function TicketEntry() {
           </motion.div>
         </div>
 
-        {/* Search and Actions */}
         <motion.div 
           className="flex flex-col gap-4"
           variants={fadeIn}
@@ -889,11 +718,10 @@ export default function TicketEntry() {
             <motion.div 
               className="relative"
               whileFocus={{ scale: 1.02 }}
-              transition={{ type: "spring", stiffness: 400, damping: 17 }}
             >
               <input
                 type="text"
-                placeholder="Cari tiket berdasarkan nomor, nama, divisi, atau deskripsi..."
+                placeholder="Cari tiket..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className={`w-full px-4 py-3 rounded-xl border ${
@@ -919,17 +747,6 @@ export default function TicketEntry() {
             >
               {loading ? "⏳" : "🔄"} {loading ? "Loading..." : "Refresh"}
             </motion.button>
-            
-            <motion.button
-              onClick={() => window.print()}
-              className={`px-3 sm:px-4 py-2 sm:py-3 rounded-xl border text-sm sm:text-base ${
-                darkMode ? "border-gray-600 hover:bg-gray-700" : "border-gray-300 hover:bg-gray-100"
-              } flex items-center gap-2`}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              🖨️ Print
-            </motion.button>
           </motion.div>
         </motion.div>
       </motion.div>
@@ -941,7 +758,6 @@ export default function TicketEntry() {
             initial={{ opacity: 0, y: -50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -50 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
             className={`mb-6 p-3 sm:p-4 rounded-xl ${
               darkMode ? "bg-red-900/30 border-red-700" : "bg-red-50 border-red-200"
             } border`}
@@ -960,7 +776,6 @@ export default function TicketEntry() {
             initial={{ opacity: 0, y: -50 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -50 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
             className={`mb-6 p-3 sm:p-4 rounded-xl ${
               darkMode ? "bg-green-900/30 border-green-700" : "bg-green-50 border-green-200"
             } border`}
@@ -973,9 +788,8 @@ export default function TicketEntry() {
         )}
       </AnimatePresence>
 
-      {/* Tickets Display - Responsive */}
+      {/* Tickets Display */}
       {isMobile ? (
-        /* Mobile View - Card Layout */
         <motion.div 
           variants={fadeIn}
           initial="hidden"
@@ -989,11 +803,11 @@ export default function TicketEntry() {
                 transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                 className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto"
               />
-              <p className="mt-2 text-gray-500">Memuat tiket dari server...</p>
+              <p className="mt-2 text-gray-500">Memuat tiket...</p>
             </div>
           ) : filteredTickets.length === 0 ? (
             <div className="text-center p-8 text-gray-500">
-              {searchQuery ? "Tidak ada tiket yang cocok dengan pencarian" : "Tidak ada tiket yang belum diproses"}
+              {searchQuery ? "Tidak ada tiket yang cocok" : "Tidak ada tiket"}
             </div>
           ) : (
             <AnimatePresence>
@@ -1013,7 +827,6 @@ export default function TicketEntry() {
           )}
         </motion.div>
       ) : (
-        /* Desktop View - Table Layout */
         <motion.div 
           variants={fadeIn}
           initial="hidden"
@@ -1030,7 +843,6 @@ export default function TicketEntry() {
                   <th className="p-4 text-left">Priority</th>
                   <th className="p-4 text-left">Description</th>
                   <th className="p-4 text-left">Lampiran</th>
-                  <th className="p-4 text-left">Assignee</th>
                   <th className="p-4 text-left">Status</th>
                   <th className="p-4 text-center">Actions</th>
                 </tr>
@@ -1038,19 +850,19 @@ export default function TicketEntry() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={9} className="p-8 text-center">
+                    <td colSpan={8} className="p-8 text-center">
                       <motion.div 
                         animate={{ rotate: 360 }}
                         transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                         className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto"
                       />
-                      <p className="mt-2 text-gray-500">Memuat tiket dari server...</p>
+                      <p className="mt-2 text-gray-500">Memuat tiket...</p>
                     </td>
                   </tr>
                 ) : filteredTickets.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="p-8 text-center text-gray-500">
-                      {searchQuery ? "Tidak ada tiket yang cocok dengan pencarian" : "Tidak ada tiket yang belum diproses"}
+                    <td colSpan={8} className="p-8 text-center text-gray-500">
+                      {searchQuery ? "Tidak ada tiket yang cocok" : "Tidak ada tiket"}
                     </td>
                   </tr>
                 ) : (
@@ -1063,7 +875,6 @@ export default function TicketEntry() {
                         exit={{ opacity: 0, y: -20 }}
                         transition={{ duration: 0.3, delay: index * 0.05 }}
                         className={index % 2 === 0 ? (darkMode ? "bg-gray-800" : "bg-white") : (darkMode ? "bg-gray-700" : "bg-gray-50")}
-                        whileHover={{ backgroundColor: darkMode ? "rgba(55, 65, 81, 0.5)" : "rgba(243, 244, 246, 0.5)" }}
                       >
                         <td className="p-4 font-mono font-bold">{ticket.ticketNo}</td>
                         <td className="p-4">{ticket.user}</td>
@@ -1075,12 +886,9 @@ export default function TicketEntry() {
                         <td className="p-4">
                           <AttachmentViewer attachment={ticket.attachment} ticketNo={ticket.ticketNo} darkMode={darkMode} />
                         </td>
-                        <td className="p-4">{ticket.assignee}</td>
                         <td className="p-4">
                           <span className={`px-2 py-1 rounded-full text-xs ${
                             ticket.status === 'Belum' ? 'bg-yellow-100 text-yellow-800' :
-                            ticket.status === 'Selesai' ? 'bg-green-100 text-green-800' :
-                            ticket.status === 'Ditolak' ? 'bg-red-100 text-red-800' :
                             'bg-gray-100 text-gray-800'
                           }`}>
                             {ticket.status}
@@ -1094,7 +902,7 @@ export default function TicketEntry() {
                                 setSelectedTicket(ticket);
                               }}
                               className="px-3 py-1 bg-green-500 text-white rounded-lg text-sm"
-                              whileHover={{ scale: 1.1, boxShadow: "0 0 8px rgba(34, 197, 94, 0.5)" }}
+                              whileHover={{ scale: 1.1 }}
                               whileTap={{ scale: 0.9 }}
                               title="Selesaikan Ticket"
                             >
@@ -1102,23 +910,11 @@ export default function TicketEntry() {
                             </motion.button>
                             <motion.button
                               onClick={() => {
-                                setActiveModal("decline");
-                                setSelectedTicket(ticket);
-                              }}
-                              className="px-3 py-1 bg-yellow-500 text-white rounded-lg text-sm"
-                              whileHover={{ scale: 1.1, boxShadow: "0 0 8px rgba(234, 179, 8, 0.5)" }}
-                              whileTap={{ scale: 0.9 }}
-                              title="Tolak Ticket"
-                            >
-                              ❌
-                            </motion.button>
-                            <motion.button
-                              onClick={() => {
                                 setActiveModal("delete");
                                 setSelectedTicket(ticket);
                               }}
                               className="px-3 py-1 bg-red-500 text-white rounded-lg text-sm"
-                              whileHover={{ scale: 1.1, boxShadow: "0 0 8px rgba(239, 68, 68, 0.5)" }}
+                              whileHover={{ scale: 1.1 }}
                               whileTap={{ scale: 0.9 }}
                               title="Hapus Ticket"
                             >
@@ -1142,61 +938,14 @@ export default function TicketEntry() {
           <ResolveModal
             ticket={selectedTicket}
             onClose={() => setActiveModal(null)}
-            onSubmit={async (ticketId, notes, filePath, sharePointItemId) => {
-              try {
-                setError("");
-                
-                // Data yang dikirim ke server Railway
-                const resolveData = {
-                  notes: notes || "",
-                  operator: userName,
-                  resolvedPhoto: filePath,
-                  sharePointItemId: sharePointItemId,
-                  sharePointSync: true
-                };
-
-                console.log('Sending resolve data to Railway:', resolveData);
-
-                // Update status di database Railway
-                await apiRequest(`/api/tickets/${ticketId}/resolve`, {
-                  method: "POST",
-                  body: resolveData
-                });
-                
-                setSuccess(`✅ Ticket berhasil diselesaikan dan disimpan ke SharePoint! (ID: ${sharePointItemId})`);
-                setActiveModal(null);
-                await loadTickets();
-              } catch (err) {
-                console.error('Error in main resolve handler:', err);
-                setError("Gagal menyelesaikan tiket: " + err.message);
-              }
+            onSuccess={(message) => {
+              setSuccess(message);
+              setActiveModal(null);
+              // Hapus ticket dari local state setelah berhasil disimpan ke SharePoint
+              setTickets(prev => prev.filter(t => t.id !== selectedTicket.id));
             }}
             darkMode={darkMode}
             userName={userName}
-          />
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {activeModal === "decline" && selectedTicket && (
-          <DeclineModal
-            ticket={selectedTicket}
-            onClose={() => setActiveModal(null)}
-            onSubmit={async (ticketId, reason) => {
-              try {
-                setError("");
-                await apiRequest(`/api/tickets/${ticketId}/decline`, {
-                  method: "POST",
-                  body: { notes: reason || "", operator: userName }
-                });
-                setSuccess("Ticket berhasil ditolak");
-                setActiveModal(null);
-                await loadTickets();
-              } catch (err) {
-                setError("Gagal menolak tiket: " + err.message);
-              }
-            }}
-            darkMode={darkMode}
           />
         )}
       </AnimatePresence>
@@ -1206,16 +955,10 @@ export default function TicketEntry() {
           <DeleteModal
             ticket={selectedTicket}
             onClose={() => setActiveModal(null)}
-            onSubmit={async (ticketId) => {
-              try {
-                setError("");
-                await apiRequest(`/api/tickets/${ticketId}`, { method: "DELETE" });
-                setSuccess("Ticket berhasil dihapus");
-                setActiveModal(null);
-                await loadTickets();
-              } catch (err) {
-                setError("Gagal menghapus tiket: " + err.message);
-              }
+            onSuccess={() => {
+              setSuccess("Ticket berhasil dihapus");
+              setActiveModal(null);
+              setTickets(prev => prev.filter(t => t.id !== selectedTicket.id));
             }}
             darkMode={darkMode}
           />
@@ -1225,60 +968,32 @@ export default function TicketEntry() {
   );
 }
 
-// Modal Components lainnya tetap sama
-const DeclineModal = ({ ticket, onClose, onSubmit, darkMode }) => {
-  const [reason, setReason] = useState("");
+// Delete Modal
+const DeleteModal = ({ ticket, onClose, onSuccess, darkMode }) => {
+  const [deleting, setDeleting] = useState(false);
 
-  return (
-    <Modal title={`Tolak Ticket ${ticket.ticketNo}`} onClose={onClose} darkMode={darkMode}>
-      <div className="space-y-4">
-        <div>
-          <label className="block mb-2 font-medium">Alasan Penolakan</label>
-          <textarea
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            rows={3}
-            className={`w-full p-2 border rounded ${
-              darkMode ? "bg-gray-700 border-gray-600" : "border-gray-300"
-            }`}
-            placeholder="Berikan alasan penolakan..."
-            required
-          />
-        </div>
-        <div className="flex gap-2 justify-end">
-          <motion.button
-            onClick={onClose}
-            className={`px-4 py-2 border rounded-lg ${
-              darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"
-            }`}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            Batal
-          </motion.button>
-          <motion.button
-            onClick={() => onSubmit(ticket.id, reason)}
-            disabled={!reason.trim()}
-            className="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            Tolak Ticket
-          </motion.button>
-        </div>
-      </div>
-    </Modal>
-  );
-};
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      // Langsung hapus dari local state saja
+      // Karena data utama sudah di SharePoint
+      await new Promise(resolve => setTimeout(resolve, 500)); // Simulasi loading
+      onSuccess();
+    } catch (error) {
+      console.error('Delete error:', error);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
-const DeleteModal = ({ ticket, onClose, onSubmit, darkMode }) => {
   return (
     <Modal title={`Hapus Ticket ${ticket.ticketNo}`} onClose={onClose} darkMode={darkMode}>
       <div className="space-y-4">
-        <p>Apakah Anda yakin ingin menghapus ticket ini? Tindakan ini tidak dapat dibatalkan.</p>
+        <p>Apakah Anda yakin ingin menghapus ticket ini dari daftar?</p>
         <div className="flex gap-2 justify-end">
           <motion.button
             onClick={onClose}
+            disabled={deleting}
             className={`px-4 py-2 border rounded-lg ${
               darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"
             }`}
@@ -1288,12 +1003,20 @@ const DeleteModal = ({ ticket, onClose, onSubmit, darkMode }) => {
             Batal
           </motion.button>
           <motion.button
-            onClick={() => onSubmit(ticket.id)}
-            className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+            onClick={handleDelete}
+            disabled={deleting}
+            className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 flex items-center gap-2"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
-            Hapus
+            {deleting ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Menghapus...
+              </>
+            ) : (
+              'Hapus'
+            )}
           </motion.button>
         </div>
       </div>
