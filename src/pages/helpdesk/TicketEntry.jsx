@@ -38,6 +38,151 @@ const apiRequest = async (endpoint, options = {}) => {
   }
 };
 
+// Konfigurasi SharePoint
+const SHAREPOINT_CONFIG = {
+  siteId: "waskitainfra.sharepoint.com,32252c41-8aed-4ed2-ba35-b6e2731b0d4a,fb2ae80c-1283-4942-a3e8-0d47e8d004fb",
+  listId: "e4a152ba-ee6e-4e1d-9c74-04e8d32ea912",
+  restUrl: "https://waskitainfra.sharepoint.com/sites/ITHELPDESK",
+  graphScopes: ["Sites.ReadWrite.All"],
+  sharepointScopes: ["https://waskitainfra.sharepoint.com/.default"],
+  donePhotoField: "ScreenshotBuktiTicketsudahDilaku"
+};
+
+// Fungsi helper untuk SharePoint
+const sharePointAPI = {
+  // Create item di SharePoint
+  createItem: async (instance, accounts, fields) => {
+    const account = accounts?.[0];
+    const token = await instance.acquireTokenSilent({ 
+      scopes: SHAREPOINT_CONFIG.graphScopes, 
+      account 
+    });
+
+    const url = `https://graph.microsoft.com/v1.0/sites/${SHAREPOINT_CONFIG.siteId}/lists/${SHAREPOINT_CONFIG.listId}/items`;
+    
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token.accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ fields }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`SharePoint API error: ${errorText}`);
+    }
+
+    return await response.json();
+  },
+
+  // Upload attachment ke SharePoint
+  uploadAttachment: async (instance, accounts, itemId, file) => {
+    const account = accounts?.[0];
+    const token = await instance.acquireTokenSilent({ 
+      scopes: SHAREPOINT_CONFIG.sharepointScopes, 
+      account 
+    });
+
+    const buffer = await file.arrayBuffer();
+    const uploadUrl = `${SHAREPOINT_CONFIG.restUrl}/_api/web/lists(guid'${SHAREPOINT_CONFIG.listId}')/items(${itemId})/AttachmentFiles/add(FileName='${encodeURIComponent(file.name)}')`;
+    
+    const response = await fetch(uploadUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token.accessToken}`,
+        Accept: "application/json;odata=verbose",
+        "Content-Type": "application/octet-stream",
+      },
+      body: buffer,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Attachment upload failed: ${errorText}`);
+    }
+
+    return { fileName: file.name };
+  },
+
+  // Update field di SharePoint
+  updateField: async (instance, accounts, itemId, fields) => {
+    const account = accounts?.[0];
+    const token = await instance.acquireTokenSilent({ 
+      scopes: SHAREPOINT_CONFIG.graphScopes, 
+      account 
+    });
+
+    const url = `https://graph.microsoft.com/v1.0/sites/${SHAREPOINT_CONFIG.siteId}/lists/${SHAREPOINT_CONFIG.listId}/items/${itemId}/fields`;
+    
+    const response = await fetch(url, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${token.accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(fields),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Field update failed: ${errorText}`);
+    }
+
+    return await response.json();
+  }
+};
+
+// Fungsi untuk memformat data ticket ke format SharePoint
+const formatTicketForSharePoint = (ticket, notes, userName, filePath = null) => {
+  // Map priority dari format aplikasi ke format SharePoint
+  const priorityMap = {
+    'urgent': 'High',
+    'high': 'High', 
+    'normal': 'Normal',
+    'low': 'Low'
+  };
+
+  // Map department/divisi
+  const departmentMap = {
+    'IT': 'IT & System',
+    'HR': 'Human Capital',
+    'Finance': 'Finance & Accounting',
+    'Engineering': 'Engineering',
+    'Marketing': 'Marketing & Sales',
+    'Operation': 'Operation & Maintenance',
+    'Procurement': 'Procurement & Logistic',
+    'Project': 'Project',
+    'QHSE': 'QHSE',
+    'Warehouse': 'Warehouse',
+    // Tambahkan mapping lainnya sesuai kebutuhan
+  };
+
+  const fields = {
+    Title: ticket.description ? String(ticket.description).slice(0, 120) : `Ticket ${ticket.ticketNo}`,
+    TicketNumber: ticket.ticketNo || "",
+    Description: ticket.description || "",
+    Priority: priorityMap[ticket.priority?.toLowerCase()] || "Normal",
+    Status: "Selesai",
+    Divisi: departmentMap[ticket.department] || ticket.department || "Umum",
+    DateReported: ticket.createdAt ? new Date(ticket.createdAt).toISOString() : new Date().toISOString(),
+    DateFinished: new Date().toISOString(),
+    TipeTicket: "IT Support",
+    Assignedto0: userName || "IT Team",
+    Issueloggedby: userName || "IT Team",
+    ResolutionNotes: notes || "",
+    UserRequestor: ticket.user || "",
+  };
+
+  // Jika ada file path, tambahkan ke metadata
+  if (filePath) {
+    fields[SHAREPOINT_CONFIG.donePhotoField] = filePath;
+  }
+
+  return fields;
+};
+
 // Animation variants
 const fadeIn = {
   hidden: { opacity: 0, y: 20 },
@@ -445,10 +590,165 @@ const MobileTicketCard = ({ ticket, index, darkMode, onAction }) => {
   );
 };
 
+// Modal Resolve dengan Integrasi SharePoint
+const ResolveModal = ({ ticket, onClose, onSubmit, darkMode, userName }) => {
+  const [notes, setNotes] = useState("");
+  const [file, setFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const { instance, accounts } = useMsal();
+
+  const handleSubmit = async () => {
+    setUploading(true);
+    try {
+      let sharePointItemId = null;
+      let uploadedFileName = null;
+
+      // 1. Format data untuk SharePoint
+      const sharePointFields = formatTicketForSharePoint(ticket, notes, userName);
+      
+      // 2. Create item di SharePoint
+      const sharePointResult = await sharePointAPI.createItem(instance, accounts, sharePointFields);
+      sharePointItemId = sharePointResult.id;
+      console.log('SharePoint item created:', sharePointItemId);
+
+      // 3. Jika ada file, upload attachment
+      if (file && sharePointItemId) {
+        try {
+          const uploadResult = await sharePointAPI.uploadAttachment(instance, accounts, sharePointItemId, file);
+          uploadedFileName = uploadResult.fileName;
+          
+          // 4. Update metadata dengan nama file
+          await sharePointAPI.updateField(instance, accounts, sharePointItemId, {
+            [SHAREPOINT_CONFIG.donePhotoField]: uploadedFileName
+          });
+          console.log('File uploaded to SharePoint:', uploadedFileName);
+        } catch (uploadError) {
+          console.warn('File upload failed, but continuing:', uploadError);
+          // Lanjutkan tanpa file jika upload gagal
+        }
+      }
+
+      // 5. Update status di database lokal (Railway) dengan informasi SharePoint
+      await onSubmit(ticket.id, notes, uploadedFileName, sharePointItemId);
+
+    } catch (error) {
+      console.error('Error in handleSubmit:', error);
+      throw error;
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <Modal title={`Selesaikan Ticket ${ticket.ticketNo}`} onClose={onClose} darkMode={darkMode}>
+      <div className="space-y-4">
+        <div className={`p-4 rounded-lg ${darkMode ? "bg-blue-900/20 border border-blue-700" : "bg-blue-50 border border-blue-200"}`}>
+          <h4 className="font-semibold text-blue-600 dark:text-blue-400 mb-2">📋 Informasi Ticket</h4>
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <div>
+              <span className="font-medium">No. Ticket:</span> {ticket.ticketNo}
+            </div>
+            <div>
+              <span className="font-medium">User:</span> {ticket.user}
+            </div>
+            <div>
+              <span className="font-medium">Divisi:</span> {ticket.department}
+            </div>
+            <div>
+              <span className="font-medium">Priority:</span> {ticket.priority}
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label className="block mb-2 font-medium">Upload Bukti Penyelesaian (Opsional)</label>
+          <input
+            type="file"
+            accept="image/*,.pdf,.doc,.docx"
+            onChange={(e) => setFile(e.target.files[0])}
+            className={`w-full p-2 border rounded ${
+              darkMode ? "bg-gray-700 border-gray-600" : "border-gray-300"
+            }`}
+            disabled={uploading}
+          />
+          {file && (
+            <p className="text-sm text-green-500 mt-1">
+              📎 File selected: {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
+            </p>
+          )}
+          <p className="text-xs text-gray-500 mt-1">
+            File akan disimpan sebagai lampiran di SharePoint
+          </p>
+        </div>
+
+        <div>
+          <label className="block mb-2 font-medium">Catatan Penyelesaian</label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={4}
+            className={`w-full p-3 border rounded-lg ${
+              darkMode ? "bg-gray-700 border-gray-600" : "border-gray-300"
+            }`}
+            placeholder="Jelaskan tindakan yang dilakukan untuk menyelesaikan ticket ini..."
+            disabled={uploading}
+          />
+        </div>
+
+        <div className={`p-3 rounded-lg ${darkMode ? "bg-yellow-900/20 border border-yellow-700" : "bg-yellow-50 border border-yellow-200"}`}>
+          <div className="flex items-start gap-2">
+            <span className="text-yellow-600 dark:text-yellow-400">📢</span>
+            <div className="text-sm">
+              <strong>Perhatian:</strong> Data akan disimpan ke:
+              <ul className="list-disc list-inside mt-1 space-y-1">
+                <li>Database Railway - Status ticket diubah menjadi "Selesai"</li>
+                <li>SharePoint List - Data lengkap beserta lampiran (jika ada)</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-2 justify-end pt-4">
+          <motion.button
+            onClick={onClose}
+            disabled={uploading}
+            className={`px-4 py-2 border rounded-lg ${
+              darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"
+            } ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+            whileHover={!uploading ? { scale: 1.05 } : {}}
+            whileTap={!uploading ? { scale: 0.95 } : {}}
+          >
+            Batal
+          </motion.button>
+          <motion.button
+            onClick={handleSubmit}
+            disabled={uploading}
+            className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            whileHover={!uploading ? { scale: 1.05 } : {}}
+            whileTap={!uploading ? { scale: 0.95 } : {}}
+          >
+            {uploading ? (
+              <>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Menyimpan ke SharePoint...
+              </>
+            ) : (
+              <>
+                <span>✅</span>
+                Konfirmasi Selesai
+              </>
+            )}
+          </motion.button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
 // Main Component
 export default function TicketEntry() {
   const { dark: darkMode } = useTheme();
-  const { accounts } = useMsal();
+  const { instance, accounts } = useMsal();
   const [tickets, setTickets] = useState([]);
   const [filteredTickets, setFilteredTickets] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -541,8 +841,6 @@ export default function TicketEntry() {
     }
   };
 
-  // ... (sisa kode handleResolve, handleDecline, handleDelete, dll tetap sama)
-
   return (
     <motion.div 
       initial={{ opacity: 0 }}
@@ -563,7 +861,7 @@ export default function TicketEntry() {
               Ticket Management
             </h1>
             <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base">
-              Kelola tiket yang belum diproses - Connected to Railway
+              Kelola tiket yang belum diproses - Connected to Railway & SharePoint
             </p>
             <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
               Backend: https://it-backend-production.up.railway.app
@@ -844,21 +1142,37 @@ export default function TicketEntry() {
           <ResolveModal
             ticket={selectedTicket}
             onClose={() => setActiveModal(null)}
-            onSubmit={async (ticketId, notes, file) => {
+            onSubmit={async (ticketId, notes, filePath, sharePointItemId) => {
               try {
                 setError("");
+                
+                // Data yang dikirim ke server Railway
+                const resolveData = {
+                  notes: notes || "",
+                  operator: userName,
+                  resolvedPhoto: filePath,
+                  sharePointItemId: sharePointItemId,
+                  sharePointSync: true
+                };
+
+                console.log('Sending resolve data to Railway:', resolveData);
+
+                // Update status di database Railway
                 await apiRequest(`/api/tickets/${ticketId}/resolve`, {
                   method: "POST",
-                  body: { notes: notes || "", operator: userName }
+                  body: resolveData
                 });
-                setSuccess("Ticket berhasil diselesaikan");
+                
+                setSuccess(`✅ Ticket berhasil diselesaikan dan disimpan ke SharePoint! (ID: ${sharePointItemId})`);
                 setActiveModal(null);
                 await loadTickets();
               } catch (err) {
+                console.error('Error in main resolve handler:', err);
                 setError("Gagal menyelesaikan tiket: " + err.message);
               }
             }}
             darkMode={darkMode}
+            userName={userName}
           />
         )}
       </AnimatePresence>
@@ -911,61 +1225,7 @@ export default function TicketEntry() {
   );
 }
 
-// Modal Components (tetap sama)
-const ResolveModal = ({ ticket, onClose, onSubmit, darkMode }) => {
-  const [notes, setNotes] = useState("");
-  const [file, setFile] = useState(null);
-
-  return (
-    <Modal title={`Selesaikan Ticket ${ticket.ticketNo}`} onClose={onClose} darkMode={darkMode}>
-      <div className="space-y-4">
-        <div>
-          <label className="block mb-2 font-medium">Upload Bukti (Opsional)</label>
-          <input
-            type="file"
-            onChange={(e) => setFile(e.target.files[0])}
-            className={`w-full p-2 border rounded ${
-              darkMode ? "bg-gray-700 border-gray-600" : "border-gray-300"
-            }`}
-          />
-        </div>
-        <div>
-          <label className="block mb-2 font-medium">Catatan</label>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={3}
-            className={`w-full p-2 border rounded ${
-              darkMode ? "bg-gray-700 border-gray-600" : "border-gray-300"
-            }`}
-            placeholder="Tambahkan catatan penyelesaian..."
-          />
-        </div>
-        <div className="flex gap-2 justify-end">
-          <motion.button
-            onClick={onClose}
-            className={`px-4 py-2 border rounded-lg ${
-              darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"
-            }`}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            Batal
-          </motion.button>
-          <motion.button
-            onClick={() => onSubmit(ticket.id, notes, file)}
-            className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-          >
-            Konfirmasi Selesai
-          </motion.button>
-        </div>
-      </div>
-    </Modal>
-  );
-};
-
+// Modal Components lainnya tetap sama
 const DeclineModal = ({ ticket, onClose, onSubmit, darkMode }) => {
   const [reason, setReason] = useState("");
 

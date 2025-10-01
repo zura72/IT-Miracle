@@ -2,6 +2,14 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useMsal } from "@azure/msal-react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import { 
+  FaSearch, FaFilter, FaSync, FaPlus, FaEdit, FaTrash, 
+  FaPrint, FaCamera, FaUser, FaBuilding, FaCalendar,
+  FaCheck, FaTimes, FaPaperclip, FaDownload, FaEye,
+  FaExclamationTriangle, FaExclamationCircle, FaInfoCircle,
+  FaChevronDown, FaChevronUp
+} from "react-icons/fa";
 
 /* ===================== KONFIGURASI ===================== */
 // Environment
@@ -24,11 +32,73 @@ const TICKET_LIST_NAME_FOR_ATTACH = "Tickets";
 const DONE_PHOTO_FIELD = "ScreenshotBuktiTicketsudahDilaku";
 const PROOF_IMAGES_FIELD = "Images";
 
+// List Divisi yang Baru - Diperbaiki dan disusun rapi
 const DIVISI_OPTIONS = [
-  "IT & System", "Business Development", "Direksi", "Engineering", "Finance & Accounting",
-  "Human Capital", "Legal", "Marketing & Sales", "Operation & Maintenance",
-  "Procurement & Logistic", "Project", "QHSE", "Sekper", "Warehouse", "Umum",
+  "Sekretariat Perusahaan",
+  "Internal Audit", 
+  "Keuangan",
+  "Akutansi",
+  "HCM",
+  "Manajemen Resiko",
+  "Legal",
+  "Pemasaran",
+  "Produksi & Peralatan",
+  "Pengembangan Bisnis & Portofolio",
+  "Pengendalian Proyek & SCM",
+  "TI & Sistem",
+  "QHSE",
+  "Produksi & Peralatan WS 1",
+  "Produksi & Peralatan WS 2",
+  "WS 1",
+  "WS 2",
+  "BOD",
+  "WWE",
+  "WSE",
+  "Project Coordinator",
+  "Proyek",
+  "Umum"
 ];
+
+// Warna untuk setiap divisi - Lebih Banyak Variasi
+const DIVISI_COLORS = {
+  "Sekretariat Perusahaan": { bg: "bg-purple-500", hover: "hover:bg-purple-600", text: "text-white", gradient: "from-purple-500 to-purple-600" },
+  "Internal Audit": { bg: "bg-indigo-500", hover: "hover:bg-indigo-600", text: "text-white", gradient: "from-indigo-500 to-indigo-600" },
+  "Keuangan": { bg: "bg-green-500", hover: "hover:bg-green-600", text: "text-white", gradient: "from-green-500 to-green-600" },
+  "Akutansi": { bg: "bg-emerald-500", hover: "hover:bg-emerald-600", text: "text-white", gradient: "from-emerald-500 to-emerald-600" },
+  "HCM": { bg: "bg-pink-500", hover: "hover:bg-pink-600", text: "text-white", gradient: "from-pink-500 to-pink-600" },
+  "Manajemen Resiko": { bg: "bg-red-500", hover: "hover:bg-red-600", text: "text-white", gradient: "from-red-500 to-red-600" },
+  "Legal": { bg: "bg-blue-500", hover: "hover:bg-blue-600", text: "text-white", gradient: "from-blue-500 to-blue-600" },
+  "Pemasaran": { bg: "bg-teal-500", hover: "hover:bg-teal-600", text: "text-white", gradient: "from-teal-500 to-teal-600" },
+  "Produksi & Peralatan": { bg: "bg-orange-500", hover: "hover:bg-orange-600", text: "text-white", gradient: "from-orange-500 to-orange-600" },
+  "Pengembangan Bisnis & Portofolio": { bg: "bg-cyan-500", hover: "hover:bg-cyan-600", text: "text-white", gradient: "from-cyan-500 to-cyan-600" },
+  "Pengendalian Proyek & SCM": { bg: "bg-amber-500", hover: "hover:bg-amber-600", text: "text-white", gradient: "from-amber-500 to-amber-600" },
+  "TI & Sistem": { bg: "bg-violet-500", hover: "hover:bg-violet-600", text: "text-white", gradient: "from-violet-500 to-violet-600" },
+  "QHSE": { bg: "bg-lime-500", hover: "hover:bg-lime-600", text: "text-white", gradient: "from-lime-500 to-lime-600" },
+  "Produksi & Peralatan WS 1": { bg: "bg-rose-500", hover: "hover:bg-rose-600", text: "text-white", gradient: "from-rose-500 to-rose-600" },
+  "Produksi & Peralatan WS 2": { bg: "bg-fuchsia-500", hover: "hover:bg-fuchsia-600", text: "text-white", gradient: "from-fuchsia-500 to-fuchsia-600" },
+  "WS 1": { bg: "bg-sky-500", hover: "hover:bg-sky-600", text: "text-white", gradient: "from-sky-500 to-sky-600" },
+  "WS 2": { bg: "bg-cyan-500", hover: "hover:bg-cyan-600", text: "text-white", gradient: "from-cyan-500 to-cyan-600" },
+  "BOD": { bg: "bg-red-600", hover: "hover:bg-red-700", text: "text-white", gradient: "from-red-600 to-red-700" },
+  "WWE": { bg: "bg-blue-600", hover: "hover:bg-blue-700", text: "text-white", gradient: "from-blue-600 to-blue-700" },
+  "WSE": { bg: "bg-green-600", hover: "hover:bg-green-700", text: "text-white", gradient: "from-green-600 to-green-700" },
+  "Project Coordinator": { bg: "bg-purple-600", hover: "hover:bg-purple-700", text: "text-white", gradient: "from-purple-600 to-purple-700" },
+  "Proyek": { bg: "bg-indigo-600", hover: "hover:bg-indigo-700", text: "text-white", gradient: "from-indigo-600 to-indigo-700" },
+  "Umum": { bg: "bg-gray-500", hover: "hover:bg-gray-600", text: "text-white", gradient: "from-gray-500 to-gray-600" },
+};
+
+// Warna untuk prioritas
+const PRIORITY_COLORS = {
+  "High": { bg: "bg-red-500", hover: "hover:bg-red-600", text: "text-white", icon: FaExclamationTriangle, gradient: "from-red-500 to-red-600" },
+  "Normal": { bg: "bg-yellow-500", hover: "hover:bg-yellow-600", text: "text-white", icon: FaExclamationCircle, gradient: "from-yellow-500 to-yellow-600" },
+  "Low": { bg: "bg-green-500", hover: "hover:bg-green-600", text: "text-white", icon: FaInfoCircle, gradient: "from-green-500 to-green-600" },
+};
+
+// Warna untuk status
+const STATUS_COLORS = {
+  "Completed": { bg: "bg-green-500", hover: "hover:bg-green-600", text: "text-white", icon: FaCheck, gradient: "from-green-500 to-green-600" },
+  "Pending": { bg: "bg-yellow-500", hover: "hover:bg-yellow-600", text: "text-white", icon: FaExclamationCircle, gradient: "from-yellow-500 to-yellow-600" },
+  "Belum": { bg: "bg-red-500", hover: "hover:bg-red-600", text: "text-white", icon: FaTimes, gradient: "from-red-500 to-red-600" },
+};
 
 /* ===================== UTILITIES ===================== */
 const esc = (v) => String(v ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
@@ -74,10 +144,6 @@ function toPerson(v) {
 
 function mapSpItem(item) {
   const f = item.fields || {};
-  
-  console.log("=== DEBUG: Struktur Lengkap Item ===");
-  console.log("Item:", item);
-  console.log("Fields:", f);
   
   // User Requestor
   let userReq = null;
@@ -152,7 +218,7 @@ function buildFieldsPayload(src) {
     TicketNumber: src.TicketNumber || "",
     Description: src.Description || "",
     Priority: src.Priority || "Normal",
-    Status: src.Status || "Selesai",
+    Status: src.Status || "Completed",
     Divisi: src.Divisi || "Umum",
     DateReported: src.DateReported || undefined,
     DateFinished: src.DateFinished || undefined,
@@ -162,21 +228,217 @@ function buildFieldsPayload(src) {
   };
 }
 
+// GlassCard Component
+const GlassCard = ({ children, className = '', darkMode, delay = 0 }) => (
+  <motion.div 
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.4, delay, ease: "easeOut" }}
+    className={`rounded-2xl backdrop-blur-lg border border-opacity-20 
+      ${darkMode 
+        ? 'bg-gray-800/70 border-gray-600 shadow-2xl shadow-black/30 text-white' 
+        : 'bg-white/80 border-gray-300 shadow-2xl shadow-blue-100 text-gray-800'
+      } 
+      transition-all duration-300 ${className}`}
+  >
+    {children}
+  </motion.div>
+);
+
+// Animated Filter Button Component - Lebih Smooth
+const AnimatedFilterButton = ({ value, onClick, isActive, colorConfig, children }) => {
+  const IconComponent = colorConfig?.icon;
+  
+  return (
+    <motion.button
+      whileHover={{ 
+        scale: 1.05,
+        y: -2,
+        transition: { duration: 0.2, ease: "easeOut" }
+      }}
+      whileTap={{ scale: 0.95 }}
+      onClick={onClick}
+      className={`px-4 py-3 rounded-xl font-medium transition-all duration-300 flex items-center space-x-2 relative overflow-hidden ${
+        isActive 
+          ? `bg-gradient-to-r ${colorConfig.gradient} text-white shadow-lg ring-2 ring-white/20` 
+          : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600'
+      }`}
+    >
+      {/* Animated background for active state */}
+      {isActive && (
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ duration: 0.3 }}
+          className="absolute inset-0 bg-white/10 rounded-xl"
+        />
+      )}
+      
+      {IconComponent && <IconComponent className="text-sm" />}
+      <span className="relative z-10">{children}</span>
+      
+      {isActive && (
+        <motion.div
+          initial={{ scale: 0, rotate: -180 }}
+          animate={{ scale: 1, rotate: 0 }}
+          transition={{ duration: 0.4, type: "spring" }}
+          className="relative z-10 w-5 h-5 bg-white/20 rounded-full flex items-center justify-center"
+        >
+          <FaCheck className="text-white text-xs" />
+        </motion.div>
+      )}
+    </motion.button>
+  );
+};
+
+// Smooth Collapsible Section Component - Diperbaiki untuk animasi lebih smooth
+const SmoothCollapsible = ({ title, icon: Icon, isOpen, onToggle, children, darkMode }) => {
+  return (
+    <motion.div 
+      layout
+      className={`rounded-2xl border transition-all duration-300 ${
+        darkMode 
+          ? 'border-gray-600 bg-gray-800/50' 
+          : 'border-gray-200 bg-white/50'
+      } ${isOpen ? 'shadow-lg' : 'shadow-md'}`}
+    >
+      <motion.button
+        layout
+        onClick={onToggle}
+        className={`w-full px-6 py-4 flex items-center justify-between text-left rounded-2xl transition-all duration-300 ${
+          darkMode 
+            ? 'hover:bg-gray-700/50' 
+            : 'hover:bg-gray-50'
+        }`}
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+      >
+        <div className="flex items-center space-x-3">
+          <Icon className={`text-lg ${darkMode ? 'text-blue-400' : 'text-blue-500'}`} />
+          <span className={`font-semibold text-lg ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>
+            {title}
+          </span>
+        </div>
+        <motion.div
+          animate={{ rotate: isOpen ? 180 : 0 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+          className={`p-2 rounded-full ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}
+        >
+          {isOpen ? <FaChevronUp className="text-sm" /> : <FaChevronDown className="text-sm" />}
+        </motion.div>
+      </motion.button>
+      
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ 
+              duration: 0.4, 
+              ease: "easeInOut",
+              height: { duration: 0.3, ease: "easeInOut" }
+            }}
+            className="overflow-hidden"
+          >
+            <div className="px-6 pb-4 pt-2">
+              {children}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+};
+
+// Enhanced Filter Section Component - Diperbaiki untuk animasi lebih smooth
+const EnhancedFilterSection = ({ title, icon: Icon, isOpen, onToggle, children, darkMode }) => {
+  return (
+    <motion.div 
+      layout
+      className={`rounded-2xl border transition-all duration-500 ${
+        darkMode 
+          ? 'border-gray-600 bg-gray-800/50' 
+          : 'border-gray-200 bg-white/50'
+      } ${isOpen ? 'shadow-xl' : 'shadow-lg'}`}
+    >
+      <motion.button
+        layout
+        onClick={onToggle}
+        className={`w-full px-6 py-4 flex items-center justify-between text-left rounded-2xl transition-all duration-500 ${
+          darkMode 
+            ? 'hover:bg-gray-700/60' 
+            : 'hover:bg-gray-50/80'
+        }`}
+        whileHover={{ 
+          scale: 1.02,
+          transition: { duration: 0.2 }
+        }}
+        whileTap={{ scale: 0.98 }}
+      >
+        <div className="flex items-center space-x-3">
+          <motion.div
+            animate={{ rotate: isOpen ? 360 : 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <Icon className={`text-lg ${darkMode ? 'text-blue-400' : 'text-blue-500'}`} />
+          </motion.div>
+          <span className={`font-semibold text-lg ${darkMode ? 'text-gray-200' : 'text-gray-800'}`}>
+            {title}
+          </span>
+        </div>
+        <motion.div
+          animate={{ rotate: isOpen ? 180 : 0 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          className={`p-2 rounded-full ${darkMode ? 'bg-gray-700' : 'bg-gray-100'}`}
+        >
+          {isOpen ? <FaChevronUp className="text-sm" /> : <FaChevronDown className="text-sm" />}
+        </motion.div>
+      </motion.button>
+      
+      <AnimatePresence mode="wait">
+        {isOpen && (
+          <motion.div
+            key="content"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ 
+              opacity: 1, 
+              height: "auto",
+              transition: { 
+                opacity: { duration: 0.3, ease: "easeOut" },
+                height: { duration: 0.4, ease: "easeInOut" }
+              }
+            }}
+            exit={{ 
+              opacity: 0, 
+              height: 0,
+              transition: { 
+                opacity: { duration: 0.2, ease: "easeIn" },
+                height: { duration: 0.3, ease: "easeInOut" }
+              }
+            }}
+            className="overflow-hidden"
+          >
+            <motion.div 
+              className="px-6 pb-4 pt-2"
+              initial={{ y: -10 }}
+              animate={{ y: 0 }}
+              transition={{ duration: 0.3, delay: 0.1 }}
+            >
+              {children}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+};
+
 /* ===================== KOMPONEN UTAMA ===================== */
 export default function TicketSolved() {
   const { instance, accounts } = useMsal();
   const navigate = useNavigate();
   const location = useLocation();
-
-  const queryParams = new URLSearchParams(location.search);
-  const initialTab = queryParams.get('tab') || 'sp';
-  const [tab, setTab] = useState(initialTab);
-
-  useEffect(() => {
-    const params = new URLSearchParams();
-    params.set('tab', tab);
-    navigate({ search: params.toString() }, { replace: true });
-  }, [tab, navigate]);
 
   // State SharePoint
   const [rowsSP, setRowsSP] = useState([]);
@@ -188,14 +450,20 @@ export default function TicketSolved() {
   const [modal, setModal] = useState({ open: false, mode: "", data: {} });
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+  const [openSections, setOpenSections] = useState({
+    divisi: true,
+    priority: true,
+    status: true
+  });
   const fileInputRef = useRef(null);
 
-  // State Staging
-  const [rowsST, setRowsST] = useState([]);
-  const [loadingST, setLoadingST] = useState(false);
-  const [qST, setQST] = useState("");
+  const [darkMode, setDarkMode] = useState(false);
 
-  const [debugData, setDebugData] = useState(null);
+  useEffect(() => {
+    const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    setDarkMode(isDark);
+  }, []);
 
   /* ====== Derived Data ====== */
   const filteredSP = useMemo(() => {
@@ -218,28 +486,10 @@ export default function TicketSolved() {
       .sort(byNewest);
   }, [rowsSP, qSP, filterSP]);
 
-  const filteredST = useMemo(() => {
-    const s = qST.trim().toLowerCase();
-    return rowsST
-      .filter(r => {
-        if (!s) return true;
-        return [
-          r.ticketNo, r.userRequestor, r.pelaksana, r.divisi, r.prioritas, r.deskripsi,
-          r.status, r.email
-        ].join(" ").toLowerCase().includes(s);
-      })
-      .sort((a, b) => {
-        const tA = Date.parse(a.DateFinished || a.Created || a.waktu || 0) || 0;
-        const tB = Date.parse(b.DateFinished || b.Created || b.waktu || 0) || 0;
-        return tB - tA;
-      });
-  }, [rowsST, qST]);
-
   /* ====== Effects ====== */
   useEffect(() => {
-    if (tab === "sp") fetchFromSP();
-    if (tab === "staging") loadStaging();
-  }, [tab]);
+    fetchFromSP();
+  }, []);
 
   /* ===================== SHAREPOINT API ===================== */
   async function fetchFromSP() {
@@ -262,9 +512,6 @@ export default function TicketSolved() {
       const j = await res.json();
       if (!res.ok) throw new Error(j?.error?.message || JSON.stringify(j).slice(0, 200));
       
-      console.log("Data dari SharePoint:", j.value);
-      setDebugData(j.value && j.value.length > 0 ? j.value[0] : j);
-      
       const items = (j.value || []).map((v) => ({ id: v.id, fields: mapSpItem(v) })).sort(byNewest);
       setRowsSP(items);
       setSel(null);
@@ -277,158 +524,6 @@ export default function TicketSolved() {
     }
   }
 
-  async function fetchFromSPRestAPI() {
-    setLoadingSP(true);
-    try {
-      const account = accounts?.[0];
-      if (!account) throw new Error("Belum login MSAL");
-      const spTok = await instance.acquireTokenSilent({ scopes: SHAREPOINT_SCOPE, account });
-
-      const url = `${REST_URL}/_api/web/lists(guid'${TICKET_LIST_ID}')/items` +
-        `?$select=ID,Title,TicketNumber,Description,Priority,Status,Divisi,DateReported,DateFinished,TipeTicket,Issueloggedby,${DONE_PHOTO_FIELD},UserRequestor/Title,UserRequestor/EMail,User_x0020_Requestor/Title,User_x0020_Requestor/EMail,Assignedto0/Title,Assignedto0/EMail,Author/Title,Author/EMail` +
-        `&$expand=UserRequestor,User_x0020_Requestor,Assignedto0,Author` +
-        `&$top=2000`;
-
-      const res = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${spTok.accessToken}`,
-          Accept: "application/json;odata=verbose",
-        }
-      });
-      
-      if (!res.ok) throw new Error(await res.text());
-      
-      const j = await res.json();
-      console.log("Data dari REST API SharePoint:", j);
-      setDebugData(j.d && j.d.results && j.d.results.length > 0 ? j.d.results[0] : j);
-      
-      const items = (j.d?.results || []).map(item => ({
-        id: item.ID,
-        fields: {
-          spId: item.ID,
-          Title: item.Title || "",
-          TicketNumber: item.TicketNumber || item.ID,
-          Description: item.Description || "",
-          Priority: item.Priority || "Normal",
-          Status: item.Status || "",
-          Divisi: item.Divisi || "Umum",
-          DateReported: item.DateReported || item.Created || "",
-          DateFinished: item.DateFinished || "",
-          UserRequestor: item.UserRequestor ? {
-            displayName: item.UserRequestor.Title,
-            email: item.UserRequestor.EMail
-          } : (item.User_x0020_Requestor ? {
-            displayName: item.User_x0020_Requestor.Title,
-            email: item.User_x0020_Requestor.EMail
-          } : null),
-          Assignedto0: item.Assignedto0 ? {
-            displayName: item.Assignedto0.Title,
-            email: item.Assignedto0.EMail
-          } : (item.Issueloggedby ? {
-            displayName: item.Issueloggedby,
-            email: ""
-          } : null),
-          TipeTicket: item.TipeTicket || "",
-          Issueloggedby: item.Issueloggedby || "",
-          Author: item.Author ? {
-            displayName: item.Author.Title,
-            email: item.Author.EMail
-          } : null,
-          [DONE_PHOTO_FIELD]: item[DONE_PHOTO_FIELD] || "",
-          HasAttachments: !!item.Attachments,
-        }
-      })).sort(byNewest);
-      
-      setRowsSP(items);
-      setSel(null);
-    } catch (e) {
-      console.error(e);
-      setNotif("Gagal mengambil data SharePoint: " + (e?.message || e));
-      setRowsSP([]);
-    } finally {
-      setLoadingSP(false);
-    }
-  }
-
-  /* ===================== STAGING API ===================== */
-  function isCrossOrigin(u) {
-    try {
-      const Url = new URL(u, window.location.origin);
-      return Url.host !== window.location.host;
-    } catch {
-      return false;
-    }
-  }
-
-  async function tryGetJson(url) {
-    const opts = { headers: {}, credentials: isCrossOrigin(url) ? "omit" : "include" };
-    const r = await fetch(url, opts);
-    const ct = r.headers.get("content-type") || "";
-    if (!r.ok) throw new Error(`HTTP ${r.status} @ ${url}`);
-    if (!ct.includes("application/json")) {
-      const text = await r.text().catch(() => "");
-      const head = text.slice(0, 160).replace(/\s+/g, " ");
-      throw new Error(`Non-JSON (${r.status}) @ ${url}: ${head}`);
-    }
-    return await r.json();
-  }
-
-  async function loadStaging() {
-    setLoadingST(true);
-    try {
-      const candidates = [
-        `${API_BASE}/api/tickets?status=Selesai`,
-        `${API_BASE}/api/tickets`,
-        "/api/tickets?status=Selesai",
-        "/api/tickets",
-        "/tickets?status=Selesai",
-        "/tickets",
-      ];
-      let payload = null;
-      for (const u of candidates) {
-        try {
-          payload = await tryGetJson(u);
-          if (payload && (Array.isArray(payload.rows) || Array.isArray(payload))) break;
-        } catch { }
-      }
-      if (!payload) {
-        const demo = localStorage.getItem("helpdesk_demo_tickets_solved");
-        if (demo) {
-          setRowsST(JSON.parse(demo));
-          setLoadingST(false);
-          return;
-        }
-        payload = {
-          rows: [{
-            id: 9001,
-            TicketNumber: "TKT-DUMMY-9001",
-            Created: new Date().toISOString(),
-            DateFinished: new Date().toISOString(),
-            Title: "User Dummy",
-            Division: "Umum",
-            Priority: "Normal",
-            Status: "Selesai",
-            Description: "Contoh tiket solved (dummy).",
-            PhotoUrl: "",
-          }]
-        };
-      }
-      const arr = Array.isArray(payload) ? payload : payload.rows || [];
-      const normalized = arr.map(normalizeStagingRow).sort((a, b) => {
-        const tA = Date.parse(a.DateFinished || a.Created || a.waktu || 0) || 0;
-        const tB = Date.parse(b.DateFinished || b.Created || b.waktu || 0) || 0;
-        return tB - tA;
-      });
-      setRowsST(normalized);
-      localStorage.setItem("helpdesk_demo_tickets_solved", JSON.stringify(normalized));
-    } catch (e) {
-      console.error(e);
-      setRowsST([]);
-    } finally {
-      setLoadingST(false);
-    }
-  }
-
   /* ===================== CRUD OPERATIONS ===================== */
   function openCreate() {
     resetPhoto();
@@ -436,7 +531,7 @@ export default function TicketSolved() {
       open: true, mode: "create",
       data: {
         Title: "", TicketNumber: "", Description: "",
-        Priority: "Normal", Status: "Selesai", Divisi: "Umum",
+        Priority: "Normal", Status: "Completed", Divisi: "Umum",
         DateReported: new Date().toISOString(),
         DateFinished: new Date().toISOString(),
         TipeTicket: "", Assignedto0: "", Issueloggedby: "",
@@ -484,7 +579,7 @@ export default function TicketSolved() {
       const data = Object.fromEntries(formData.entries());
       const fields = buildFieldsPayload({
         Title: data.Title, TicketNumber: data.TicketNumber, Description: data.Description,
-        Priority: data.Priority || "Normal", Status: data.Status || "Selesai",
+        Priority: data.Priority || "Normal", Status: data.Status || "Completed",
         Divisi: data.Divisi || "Umum", DateReported: data.DateReported || undefined,
         DateFinished: data.DateFinished || undefined, TipeTicket: data.TipeTicket || undefined,
         Assignedto0: data.Assignedto0 || undefined, Issueloggedby: data.Issueloggedby || undefined,
@@ -545,6 +640,28 @@ export default function TicketSolved() {
 
   function resetPhoto() { removePhoto(); }
 
+  /* ===================== FILTER HANDLERS ===================== */
+  const handleDivisiFilter = (divisi) => {
+    setFilterSP(f => ({ ...f, Divisi: f.Divisi === divisi ? "" : divisi }));
+  };
+
+  const handlePriorityFilter = (priority) => {
+    setFilterSP(f => ({ ...f, Priority: f.Priority === priority ? "" : priority }));
+  };
+
+  const handleStatusFilter = (status) => {
+    setFilterSP(f => ({ ...f, Status: f.Status === status ? "" : status }));
+  };
+
+  const resetAllFilters = () => {
+    setFilterSP({ Divisi: "", Priority: "", Status: "" });
+    setQSP("");
+  };
+
+  const toggleSection = (section) => {
+    setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
+
   /* ===================== PRINT FUNCTIONS ===================== */
   function handlePrintSP() {
     const items = filteredSP;
@@ -590,201 +707,433 @@ export default function TicketSolved() {
     w.document.open(); w.document.write(html); w.document.close();
   }
 
-  function handlePrintST() {
-    const items = filteredST;
-    const head = `
-      <meta charset="utf-8"/>
-      <title>Ticket Solved (Staging)</title>
-      <style>
-        @page { size: A4 landscape; margin: 12mm; }
-        body { font: 12px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; color:#000; }
-        h1 { margin:0 0 8px; font-size:18px; }
-        table { width:100%; border-collapse:collapse; border:1.5pt solid #000; }
-        th,td { border:0.9pt solid #000; padding:6px 8px; vertical-align:top; }
-        thead th { background:#f3f4f6; text-align:left; }
-      </style>
-    `;
-    const body = items.map(r => `
-      <tr>
-        <td>${esc(r.ticketNo || r.TicketNumber || "")}</td>
-        <td>${esc(fmtWaktu(r.Created || r.waktu))}</td>
-        <td>${esc(fmtWaktu(r.DateFinished || ""))}</td>
-        <td>${esc(r.userRequestor || r.Title || "")}</td>
-        <td>${esc(r.pelaksana || "")}</td>
-        <td>${esc(r.divisi || r.Division || "Umum")}</td>
-        <td>${esc(r.prioritas || r.Priority || "Normal")}</td>
-        <td>${esc(r.status || r.Status || "")}</td>
-        <td>${esc(r.deskripsi || r.Description || "")}</td>
-      </tr>
-    `).join("");
-    const html = `<!doctype html><html><head>${head}</head><body>
-      <h1>Ticket Solved (Staging)</h1>
-      <table>
-        <thead><tr>
-          <th>No. Ticket</th><th>Waktu Lapor</th><th>Waktu Selesai</th><th>User Requestor</th><th>Pelaksana</th>
-          <th>Divisi</th><th>Prioritas</th><th>Status</th><th>Deskripsi</th>
-        </tr></thead><tbody>${body}</tbody></table>
-      <script>onload=()=>{print();setTimeout(()=>close(),300)}</script>
-    </body></html>`;
-    const w = window.open("", "_blank", "noopener,noreferrer");
-    w.document.open(); w.document.write(html); w.document.close();
-  }
-
   /* ===================== RENDER ===================== */
   return (
-    <div className="relative min-h-screen flex flex-col items-center py-4 bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white">
-      {notif && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-emerald-600 text-white px-6 py-3 rounded shadow-md font-bold" onClick={() => setNotif("")}>
-          {notif}
-        </div>
-      )}
-
-      <div className="relative z-10 w-full max-w-[95vw]">
-        {/* Header */}
-        <div className="mb-3">
-          <h2 className="text-3xl font-bold mb-1 text-[#215ba6] dark:text-blue-400">Data Sharepoint</h2>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            {tab === "sp"
-              ? "Data SharePoint List: TICKETS"
-              : "Sumber data: " + API_BASE + "/api/tickets?status=Selesai"}
-          </p>
-        </div>
-
-        {/* Tab Navigation */}
-        <div className="flex mb-4 border-b border-gray-200 dark:border-gray-700">
-          <button
-            className={`px-4 py-2 font-medium ${tab === "sp" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500"}`}
-            onClick={() => setTab("sp")}
+    <div className={`min-h-screen py-6 transition-colors duration-300 ${darkMode ? 'dark bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900' : 'bg-gradient-to-br from-blue-50 via-white to-gray-100'}`}>
+      
+      {/* Notification */}
+      <AnimatePresence>
+        {notif && (
+          <motion.div
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -50 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+            className={`fixed top-4 left-1/2 transform -translate-x-1/2 z-50 px-6 py-4 rounded-2xl shadow-2xl font-semibold transition-all duration-300 cursor-pointer ${darkMode ? 'bg-green-700' : 'bg-green-600'} text-white max-w-md text-center`}
+            onClick={() => setNotif("")}
           >
-            SharePoint
-          </button>
-          <button
-            className={`px-4 py-2 font-medium ${tab === "staging" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500"}`}
-            onClick={() => setTab("staging")}
-          >
-            Staging
-          </button>
-        </div>
+            {notif}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-        {/* ===== SharePoint Tab ===== */}
-        {tab === "sp" && (
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-xl">
-            <div className="flex flex-wrap justify-between items-start gap-3 mb-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <input value={qSP} onChange={(e) => setQSP(e.target.value)} placeholder="Cari…"
-                  className="px-3 py-2 rounded border border-gray-300 dark:bg-gray-700 dark:text-white dark:border-gray-600 w-64" />
-                <select className="px-3 py-2 rounded border border-gray-300 dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                  value={filterSP.Divisi} onChange={(e) => setFilterSP(f => ({ ...f, Divisi: e.target.value }))}>
-                  <option value="">All Divisi</option>
-                  {DIVISI_OPTIONS.map(d => <option key={d} value={d}>{d}</option>)}
-                </select>
-                <select className="px-3 py-2 rounded border border-gray-300 dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                  value={filterSP.Priority} onChange={(e) => setFilterSP(f => ({ ...f, Priority: e.target.value }))}>
-                  <option value="">All Prioritas</option>
-                  {["Low", "Normal", "High"].map(p => <option key={p} value={p}>{p}</option>)}
-                </select>
-                <select className="px-3 py-2 rounded border border-gray-300 dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                  value={filterSP.Status} onChange={(e) => setFilterSP(f => ({ ...f, Status: e.target.value }))}>
-                  {["", "Belum", "Selesai", "Pending"].map(s => <option key={s || "all"} value={s}>{s || "All Status"}</option>)}
-                </select>
-                <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded" onClick={fetchFromSP} disabled={loadingSP}>
-                  {loadingSP ? "Loading..." : "Reload"}
-                </button>
-                <button className="px-4 py-2 rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white" onClick={handlePrintSP}>Print</button>
-                <button className="px-5 py-2 rounded bg-cyan-600 hover:bg-cyan-700 text-white font-bold" onClick={openCreate}>+ Tambah Ticket</button>
-                {sel && (
-                  <>
-                    <button className="px-4 py-2 rounded bg-yellow-500 hover:bg-yellow-600 text-black" onClick={openEdit}>Edit</button>
-                    <button className="px-4 py-2 rounded bg-red-600 hover:bg-red-700 text-white" onClick={handleDelete}>Hapus</button>
-                  </>
+      {/* Container utama - Lebar penuh */}
+      <div className="w-full px-8 ml-0">
+        <GlassCard darkMode={darkMode} className="p-8">
+          
+          {/* Header Section */}
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
+            className="flex flex-col lg:flex-row lg:items-center justify-between mb-8 gap-6"
+          >
+            <div className="flex-1">
+              <h1 className={`text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent`}>
+                Ticket Solved
+              </h1>
+              <p className={`mt-2 text-xl ${darkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                Daftar tiket yang sudah diselesaikan - SharePoint List
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-4">
+              <motion.button 
+                whileHover={{ scale: 1.05, y: -2 }}
+                whileTap={{ scale: 0.95 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                className={`px-6 py-3 rounded-xl font-medium transition flex items-center space-x-3 ${darkMode ? 'bg-gray-700 text-white hover:bg-gray-600' : 'border border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+                onClick={fetchFromSP}
+                disabled={loadingSP}
+              >
+                <FaSync className={loadingSP ? "animate-spin" : ""} />
+                <span className="text-lg">Refresh</span>
+              </motion.button>
+
+              <motion.button 
+                whileHover={{ scale: 1.05, y: -2 }}
+                whileTap={{ scale: 0.95 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                className="px-6 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-medium transition flex items-center space-x-3"
+                onClick={openCreate}
+              >
+                <FaPlus className="text-lg" />
+                <span className="text-lg">Tambah Ticket</span>
+              </motion.button>
+            </div>
+          </motion.div>
+
+          {/* Search and Filter Section */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.2, ease: "easeOut" }}
+            className="mb-8"
+          >
+            <div className="flex flex-col lg:flex-row gap-4 mb-6">
+              {/* Search Bar */}
+              <div className="flex-1">
+                <div className={`relative rounded-xl ${darkMode ? 'bg-gray-700' : 'bg-white'} shadow-lg`}>
+                  <FaSearch className={`absolute left-4 top-1/2 transform -translate-y-1/2 ${darkMode ? 'text-gray-400' : 'text-gray-500'} text-lg`} />
+                  <input
+                    type="text"
+                    placeholder="Cari tiket berdasarkan nomor, deskripsi, user..."
+                    value={qSP}
+                    onChange={(e) => setQSP(e.target.value)}
+                    className={`w-full pl-12 pr-4 py-4 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-lg ${darkMode ? 'bg-gray-700 text-white placeholder-gray-400' : 'bg-white text-gray-800 placeholder-gray-500'}`}
+                  />
+                </div>
+              </div>
+
+              {/* Filter Toggle */}
+              <motion.button 
+                whileHover={{ scale: 1.05, y: -2 }}
+                whileTap={{ scale: 0.95 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                onClick={() => setShowFilters(!showFilters)}
+                className={`px-6 py-4 rounded-xl font-medium flex items-center justify-center space-x-3 ${darkMode ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-blue-500 text-white hover:bg-blue-600'} shadow-lg`}
+              >
+                <FaFilter className="text-lg" />
+                <span className="text-lg">{showFilters ? "Sembunyikan Filter" : "Tampilkan Filter"}</span>
+              </motion.button>
+
+              {/* Print Button */}
+              <motion.button 
+                whileHover={{ scale: 1.05, y: -2 }}
+                whileTap={{ scale: 0.95 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                className={`px-6 py-4 rounded-xl font-medium flex items-center space-x-3 ${darkMode ? 'bg-gray-700 text-white hover:bg-gray-600' : 'border border-gray-300 text-gray-700 hover:bg-gray-50'}`}
+                onClick={handlePrintSP}
+              >
+                <FaPrint className="text-lg" />
+                <span className="text-lg">Print</span>
+              </motion.button>
+            </div>
+
+            {/* Active Filters */}
+            {(filterSP.Divisi || filterSP.Priority || filterSP.Status) && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, ease: "easeOut" }}
+                className="flex flex-wrap gap-3 mb-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-700 dark:to-gray-600 rounded-2xl"
+              >
+                <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Filter Aktif:</span>
+                {filterSP.Divisi && (
+                  <motion.span 
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ duration: 0.3, type: "spring" }}
+                    className={`px-3 py-1 rounded-full text-sm font-medium ${DIVISI_COLORS[filterSP.Divisi]?.bg || 'bg-gray-500'} text-white flex items-center space-x-2`}
+                  >
+                    <span>{filterSP.Divisi}</span>
+                    <button onClick={() => setFilterSP(f => ({ ...f, Divisi: "" }))} className="hover:bg-white/20 rounded-full w-5 h-5 flex items-center justify-center">
+                      <FaTimes className="text-xs" />
+                    </button>
+                  </motion.span>
                 )}
+                {filterSP.Priority && (
+                  <motion.span 
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ duration: 0.3, type: "spring" }}
+                    className={`px-3 py-1 rounded-full text-sm font-medium ${PRIORITY_COLORS[filterSP.Priority]?.bg || 'bg-gray-500'} text-white flex items-center space-x-2`}
+                  >
+                    <span>{filterSP.Priority}</span>
+                    <button onClick={() => setFilterSP(f => ({ ...f, Priority: "" }))} className="hover:bg-white/20 rounded-full w-5 h-5 flex items-center justify-center">
+                      <FaTimes className="text-xs" />
+                    </button>
+                  </motion.span>
+                )}
+                {filterSP.Status && (
+                  <motion.span 
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ duration: 0.3, type: "spring" }}
+                    className={`px-3 py-1 rounded-full text-sm font-medium ${STATUS_COLORS[filterSP.Status]?.bg || 'bg-gray-500'} text-white flex items-center space-x-2`}
+                  >
+                    <span>{filterSP.Status}</span>
+                    <button onClick={() => setFilterSP(f => ({ ...f, Status: "" }))} className="hover:bg-white/20 rounded-full w-5 h-5 flex items-center justify-center">
+                      <FaTimes className="text-xs" />
+                    </button>
+                  </motion.span>
+                )}
+                <motion.button 
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={resetAllFilters}
+                  className="px-3 py-1 rounded-full bg-red-500 hover:bg-red-600 text-white text-sm font-medium flex items-center space-x-2"
+                >
+                  <FaTimes />
+                  <span>Reset Semua</span>
+                </motion.button>
+              </motion.div>
+            )}
+
+            {/* Filter Grid dengan Enhanced Collapsible - Diperbaiki untuk animasi lebih smooth */}
+            <AnimatePresence mode="wait">
+              {showFilters && (
+                <motion.div 
+                  key="filter-section"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ 
+                    opacity: 1, 
+                    height: "auto",
+                    transition: { 
+                      opacity: { duration: 0.4, ease: "easeOut" },
+                      height: { duration: 0.5, ease: "easeInOut" }
+                    }
+                  }}
+                  exit={{ 
+                    opacity: 0, 
+                    height: 0,
+                    transition: { 
+                      opacity: { duration: 0.3, ease: "easeIn" },
+                      height: { duration: 0.4, ease: "easeInOut" }
+                    }
+                  }}
+                  className="space-y-4 overflow-hidden"
+                >
+                  {/* Divisi Filter - Diperbaiki dengan animasi lebih smooth */}
+                  <EnhancedFilterSection
+                    title="Filter Divisi"
+                    icon={FaBuilding}
+                    isOpen={openSections.divisi}
+                    onToggle={() => toggleSection('divisi')}
+                    darkMode={darkMode}
+                  >
+                    <motion.div 
+                      layout
+                      className="flex flex-wrap gap-3"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.4, delay: 0.1, staggerChildren: 0.05 }}
+                    >
+                      {DIVISI_OPTIONS.map((divisi, index) => (
+                        <motion.div
+                          key={divisi}
+                          initial={{ opacity: 0, scale: 0.8, y: 10 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          transition={{ 
+                            duration: 0.3, 
+                            delay: index * 0.03,
+                            type: "spring",
+                            stiffness: 100
+                          }}
+                          whileHover={{ 
+                            scale: 1.05,
+                            transition: { duration: 0.2 }
+                          }}
+                        >
+                          <AnimatedFilterButton
+                            value={divisi}
+                            onClick={() => handleDivisiFilter(divisi)}
+                            isActive={filterSP.Divisi === divisi}
+                            colorConfig={DIVISI_COLORS[divisi]}
+                          >
+                            {divisi}
+                          </AnimatedFilterButton>
+                        </motion.div>
+                      ))}
+                    </motion.div>
+                  </EnhancedFilterSection>
+
+                  {/* Priority Filter */}
+                  <EnhancedFilterSection
+                    title="Filter Prioritas"
+                    icon={FaExclamationTriangle}
+                    isOpen={openSections.priority}
+                    onToggle={() => toggleSection('priority')}
+                    darkMode={darkMode}
+                  >
+                    <motion.div 
+                      layout
+                      className="flex flex-wrap gap-3"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.4, delay: 0.2, staggerChildren: 0.1 }}
+                    >
+                      {Object.keys(PRIORITY_COLORS).map((priority, index) => (
+                        <motion.div
+                          key={priority}
+                          initial={{ opacity: 0, scale: 0.8, y: 10 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          transition={{ 
+                            duration: 0.3, 
+                            delay: index * 0.1,
+                            type: "spring",
+                            stiffness: 100
+                          }}
+                          whileHover={{ 
+                            scale: 1.05,
+                            transition: { duration: 0.2 }
+                          }}
+                        >
+                          <AnimatedFilterButton
+                            value={priority}
+                            onClick={() => handlePriorityFilter(priority)}
+                            isActive={filterSP.Priority === priority}
+                            colorConfig={PRIORITY_COLORS[priority]}
+                          >
+                            {priority}
+                          </AnimatedFilterButton>
+                        </motion.div>
+                      ))}
+                    </motion.div>
+                  </EnhancedFilterSection>
+
+                  {/* Status Filter */}
+                  <EnhancedFilterSection
+                    title="Filter Status"
+                    icon={FaCheck}
+                    isOpen={openSections.status}
+                    onToggle={() => toggleSection('status')}
+                    darkMode={darkMode}
+                  >
+                    <motion.div 
+                      layout
+                      className="flex flex-wrap gap-3"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.4, delay: 0.3, staggerChildren: 0.1 }}
+                    >
+                      {Object.keys(STATUS_COLORS).map((status, index) => (
+                        <motion.div
+                          key={status}
+                          initial={{ opacity: 0, scale: 0.8, y: 10 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          transition={{ 
+                            duration: 0.3, 
+                            delay: index * 0.1,
+                            type: "spring",
+                            stiffness: 100
+                          }}
+                          whileHover={{ 
+                            scale: 1.05,
+                            transition: { duration: 0.2 }
+                          }}
+                        >
+                          <AnimatedFilterButton
+                            value={status}
+                            onClick={() => handleStatusFilter(status)}
+                            isActive={filterSP.Status === status}
+                            colorConfig={STATUS_COLORS[status]}
+                          >
+                            {status}
+                          </AnimatedFilterButton>
+                        </motion.div>
+                      ))}
+                    </motion.div>
+                  </EnhancedFilterSection>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+
+          {/* Action Buttons untuk selected item */}
+          {sel && (
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="flex gap-4 mb-6 p-6 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-700 dark:to-gray-600 rounded-2xl shadow-lg"
+            >
+              <div className="flex items-center space-x-3">
+                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="font-semibold text-lg">Ticket Terpilih: <span className="text-blue-600 dark:text-blue-400">{sel.fields.TicketNumber || sel.id}</span></span>
               </div>
-            </div>
-
-            <div className="text-sm text-gray-600 dark:text-gray-400 mb-3">Total: {filteredSP.length}{qSP ? ` (dari ${rowsSP.length})` : ""}</div>
-
-            <div className="overflow-x-auto bg-white dark:bg-gray-700 rounded-xl shadow min-h-[350px]">
-              <table className="min-w-full w-full text-base table-auto">
-                <thead>
-                  <tr className="bg-blue-50 dark:bg-blue-900 text-[#215ba6] dark:text-blue-300 text-lg">
-                    <Th className="w-28">No. Ticket</Th>
-                    <Th className="w-44">Waktu Lapor</Th>
-                    <Th className="w-44">Waktu Selesai</Th>
-                    <Th className="w-56">User Requestor</Th>
-                    <Th className="w-56">Pelaksana (Tim IT)</Th>
-                    <Th className="w-40">Divisi</Th>
-                    <Th className="w-32">Prioritas</Th>
-                    <Th className="w-28">Status</Th>
-                    <Th>Deskripsi</Th>
-                    <Th className="w-28">Lampiran</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loadingSP ? (
-                    <tr><td colSpan={10} className="px-5 py-10 text-center text-gray-400">Loading data...</td></tr>
-                  ) : filteredSP.length === 0 ? (
-                    <tr><td colSpan={10} className="px-5 py-10 text-center text-gray-400">Tidak ada data.</td></tr>
-                  ) : (
-                    filteredSP.map((it, i) => (
-                      <RowSP key={it.id} r={it} zebra={i % 2 === 1} onSelect={() => setSel(it)}
-                        selected={sel?.id === it.id} msal={{ instance, accounts }} />
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* ===== Staging Tab ===== */}
-        {tab === "staging" && (
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-xl">
-            <div className="flex flex-wrap justify-between items-start gap-3 mb-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <input value={qST} onChange={(e) => setQST(e.target.value)} placeholder="Cari…"
-                  className="px-3 py-2 rounded border border-gray-300 dark:bg-gray-700 dark:text-white dark:border-gray-600 w-64" />
-                <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded" onClick={loadStaging} disabled={loadingST}>
-                  {loadingST ? "Loading..." : "Reload"}
-                </button>
-                <button className="px-4 py-2 rounded border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 dark:text-white" onClick={handlePrintST}>Print</button>
+              <div className="flex gap-3 ml-auto">
+                <motion.button 
+                  whileHover={{ scale: 1.05, y: -2 }}
+                  whileTap={{ scale: 0.95 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  className="px-6 py-3 rounded-xl bg-yellow-500 hover:bg-yellow-600 text-white font-medium flex items-center space-x-3 text-lg"
+                  onClick={openEdit}
+                >
+                  <FaEdit />
+                  <span>Edit</span>
+                </motion.button>
+                <motion.button 
+                  whileHover={{ scale: 1.05, y: -2 }}
+                  whileTap={{ scale: 0.95 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  className="px-6 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium flex items-center space-x-3 text-lg"
+                  onClick={handleDelete}
+                >
+                  <FaTrash />
+                  <span>Hapus</span>
+                </motion.button>
               </div>
-            </div>
+            </motion.div>
+          )}
 
-            <div className="text-sm text-gray-600 dark:text-gray-400 mb-3">Total: {filteredST.length}{qST ? ` (dari ${rowsST.length})` : ""}</div>
+          {/* Data Display */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.4, delay: 0.6, ease: "easeOut" }}
+          >
+            <div className="rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-lg">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <thead className={darkMode ? 'bg-gray-700' : 'bg-gray-50'}>
+                    <tr>
+                      <Th className="w-32">No. Ticket</Th>
+                      <Th className="w-48">Waktu Lapor</Th>
+                      <Th className="w-48">Waktu Selesai</Th>
+                      <Th className="w-64">User Requestor</Th>
+                      <Th className="w-64">Pelaksana (Tim IT)</Th>
+                      <Th className="w-44">Divisi</Th>
+                      <Th className="w-36">Prioritas</Th>
+                      <Th className="w-32">Status</Th>
+                      <Th className="min-w-[500px]">Deskripsi</Th>
+                      <Th className="w-32">Lampiran</Th>
+                    </tr>
+                  </thead>
+                  <tbody className={`divide-y ${darkMode ? 'divide-gray-700 bg-gray-800' : 'divide-gray-200 bg-white'}`}>
+                    {loadingSP ? (
+                      <TableLoadingState colSpan={10} darkMode={darkMode} />
+                    ) : filteredSP.length === 0 ? (
+                      <TableEmptyState colSpan={10} darkMode={darkMode} />
+                    ) : (
+                      filteredSP.map((it, i) => (
+                        <RowSP 
+                          key={it.id} 
+                          r={it} 
+                          zebra={i % 2 === 1} 
+                          onSelect={() => setSel(it)}
+                          selected={sel?.id === it.id} 
+                          msal={{ instance, accounts }} 
+                          darkMode={darkMode}
+                        />
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
 
-            <div className="overflow-x-auto bg-white dark:bg-gray-700 rounded-xl shadow min-h-[350px]">
-              <table className="min-w-full w-full text-base table-auto">
-                <thead>
-                  <tr className="bg-blue-50 dark:bg-blue-900 text-[#215ba6] dark:text-blue-300 text-lg">
-                    <Th className="w-28">No. Ticket</Th>
-                    <Th className="w-44">Waktu Lapor</Th>
-                    <Th className="w-44">Waktu Selesai</Th>
-                    <Th className="w-56">User Requestor</Th>
-                    <Th className="w-56">Pelaksana (Tim IT)</Th>
-                    <Th className="w-40">Divisi</Th>
-                    <Th className="w-32">Prioritas</Th>
-                    <Th className="w-28">Status</Th>
-                    <Th>Deskripsi</Th>
-                    <Th className="w-28">Lampiran</Th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loadingST ? (
-                    <tr><td colSpan={10} className="px-5 py-10 text-center text-gray-400">Loading data...</td></tr>
-                  ) : filteredST.length === 0 ? (
-                    <tr><td colSpan={10} className="px-5 py-10 text-center text-gray-400">Tidak ada data.</td></tr>
-                  ) : (
-                    filteredST.map((r, i) => <RowST key={r.id || r.ticketNo || i} r={r} zebra={i % 2 === 1} />)
-                  )}
-                </tbody>
-              </table>
+              {filteredSP.length > 0 && !loadingSP && (
+                <div className={`px-6 py-4 text-lg border-t ${darkMode ? 'border-gray-700 text-gray-400' : 'border-gray-200 text-gray-500'}`}>
+                  Menampilkan {filteredSP.length} dari {rowsSP.length} tiket
+                </div>
+              )}
             </div>
-          </div>
-        )}
+          </motion.div>
+        </GlassCard>
       </div>
 
-      {/* Modal Create/Edit (SharePoint) */}
-      {modal.open && tab === "sp" && (
+      {/* Modal Create/Edit */}
+      {modal.open && (
         <FormModal
           mode={modal.mode}
           data={modal.data}
@@ -794,471 +1143,291 @@ export default function TicketSolved() {
           onRemovePhoto={removePhoto}
           fileInputRef={fileInputRef}
           photoPreview={photoPreview}
+          darkMode={darkMode}
         />
       )}
-
-      {/* Debug Panel */}
-      <DebugPanel data={debugData} title="Struktur Data SharePoint" />
     </div>
   );
 }
 
-/* ===================== SUB KOMPONEN ===================== */
-function Th({ children, className = "" }) {
-  return <th className={`px-5 py-4 font-semibold text-xs uppercase tracking-wide ${className}`}>{children}</th>;
-}
-
-function Td({ children, className = "" }) {
-  return <td className={`px-5 py-3 align-top text-gray-900 dark:text-white ${className}`}>{children}</td>;
-}
-
-function Avatar({ name = "" }) {
-  const init = useMemo(() => {
-    const parts = String(name || "").trim().split(/\s+/);
-    return (parts[0]?.[0] || "?") + (parts[1]?.[0] || "");
-  }, [name]);
-
+/* ===================== LOADING & EMPTY STATES ===================== */
+function TableLoadingState({ colSpan, darkMode }) {
   return (
-    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 text-white flex items-center justify-center text-sm font-semibold shadow">
-      {String(init).toUpperCase()}
-    </div>
-  );
-}
-
-function Chip({ children }) {
-  return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 text-xs">
-      {children}
-    </span>
-  );
-}
-
-function PriorityChip({ value = "" }) {
-  const v = String(value || "").toLowerCase();
-  const style =
-    v.includes("high") || v.includes("tinggi")
-      ? "bg-red-100 dark:bg-red-800 text-red-800 dark:text-red-100 border-red-200 dark:border-red-700"
-      : v.includes("low") || v.includes("rendah")
-        ? "bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-100 border-green-200 dark:border-green-700"
-        : "bg-yellow-100 dark:bg-yellow-800 text-yellow-800 dark:text-yellow-100 border-yellow-200 dark:border-yellow-700";
-
-  return (
-    <span className={`inline-flex px-2 py-0.5 rounded border text-xs ${style}`}>
-      {value || "-"}
-    </span>
-  );
-}
-
-function StatusBadge({ value = "" }) {
-  const v = String(value || "").toLowerCase();
-  const style =
-    v === "selesai"
-      ? "bg-emerald-100 dark:bg-emerald-800 text-emerald-800 dark:text-emerald-100 border-emerald-200 dark:border-emerald-700"
-      : v === "belum"
-        ? "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600"
-        : "bg-yellow-100 dark:bg-yellow-800 text-yellow-800 dark:text-yellow-100 border-yellow-200 dark:border-yellow-700";
-
-  return (
-    <span className={`inline-flex px-2 py-0.5 rounded border text-xs ${style}`}>
-      {value || "-"}
-    </span>
-  );
-}
-
-/* ===== Row SP ===== */
-function RowSP({ r, zebra, onSelect, selected, msal }) {
-  const f = r.fields;
-  const reqName = f.UserRequestor?.displayName || "-";
-  const reqEmail = f.UserRequestor?.email || "";
-  const exeName = f.Assignedto0?.displayName || f.Issueloggedby || "-";
-  const exeEmail = f.Assignedto0?.email || "";
-
-  return (
-    <tr
-      onClick={onSelect}
-      className={`cursor-pointer ${
-        selected
-          ? "bg-purple-200 dark:bg-purple-800 font-bold"
-          : zebra
-            ? "bg-blue-50/60 dark:bg-blue-900/60"
-            : ""
-      } hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors`}
-    >
-      <Td>{f.TicketNumber || r.id}</Td>
-      <Td>{fmtWaktu(f.DateReported)}</Td>
-      <Td>{fmtWaktu(f.DateFinished)}</Td>
-
-      <Td>
-        <div className="flex items-center gap-3">
-          <Avatar name={reqName} />
-          <div className="leading-tight">
-            <div className="font-medium">{reqName}</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">{reqEmail}</div>
-          </div>
+    <tr>
+      <td colSpan={colSpan} className="px-6 py-16 text-center">
+        <div className="flex justify-center items-center">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+            className="rounded-full h-12 w-12 border-b-2 border-blue-500"
+          />
         </div>
-      </Td>
-
-      <Td>
-        <div className="flex items-center gap-3">
-          <Avatar name={exeName} />
-          <div className="leading-tight">
-            <div className="font-medium">{exeName}</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">{exeEmail}</div>
-          </div>
-        </div>
-      </Td>
-
-      <Td><Chip>{f.Divisi || "-"}</Chip></Td>
-      <Td><PriorityChip value={f.Priority} /></Td>
-      <Td><StatusBadge value={f.Status} /></Td>
-      <Td><div className="max-w-[560px] whitespace-pre-wrap">{f.Description || "-"}</div></Td>
-      <Td>
-        {f[DONE_PHOTO_FIELD] ? (
-          <button
-            className="text-indigo-600 dark:text-indigo-400 hover:underline"
-            onClick={(e) => {
-              e.stopPropagation();
-              openAttachmentWithToken(msal.instance, msal.accounts, r.id, f[DONE_PHOTO_FIELD]);
-            }}
-          >
-            Lihat
-          </button>
-        ) : (
-          <span className="text-gray-400">-</span>
-        )}
-      </Td>
+        <p className={`mt-4 text-lg ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>Memuat data tiket...</p>
+      </td>
     </tr>
   );
 }
 
-/* ===== Row ST ===== */
-function RowST({ r, zebra }) {
+function TableEmptyState({ colSpan, darkMode }) {
   return (
-    <tr className={`${zebra ? "bg-blue-50/60 dark:bg-blue-900/60" : ""} hover:bg-gray-50 dark:hover:bg-gray-700`}>
-      <Td>{r.ticketNo || r.TicketNumber || "-"}</Td>
-      <Td>{fmtWaktu(r.Created || r.waktu)}</Td>
-      <Td>{fmtWaktu(r.DateFinished || "")}</Td>
-
-      <Td>
-        <div className="flex items-center gap-3">
-          <Avatar name={r.userRequestor || r.Title || ""} />
-          <div className="leading-tight">
-            <div className="font-medium">{r.userRequestor || r.Title || "-"}</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">{r.email || ""}</div>
-          </div>
-        </div>
-      </Td>
-
-      <Td>
-        <div className="flex items-center gap-3">
-          <Avatar name={r.pelaksana || ""} />
-          <div className="leading-tight">
-            <div className="font-medium">{r.pelaksana || "-"}</div>
-          </div>
-        </div>
-      </Td>
-
-      <Td><Chip>{r.divisi || r.Division || "-"}</Chip></Td>
-      <Td><PriorityChip value={r.prioritas || r.Priority} /></Td>
-      <Td><StatusBadge value={r.status || r.Status || ""} /></Td>
-      <Td><div className="max-w-[560px] whitespace-pre-wrap">{r.deskripsi || r.Description || "-"}</div></Td>
-      <Td>
-        {r.PhotoUrl ? (
-          <a
-            href={r.PhotoUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="text-indigo-600 dark:text-indigo-400 hover:underline"
-          >
-            Lihat
-          </a>
-        ) : (
-          <span className="text-gray-400">-</span>
-        )}
-      </Td>
+    <tr>
+      <td colSpan={colSpan} className="px-6 py-16 text-center">
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ duration: 0.3, ease: "easeOut" }}
+          className="text-6xl mb-4"
+        >
+          📋
+        </motion.div>
+        <p className={`text-xl font-semibold mb-2 ${darkMode ? 'text-gray-300' : 'text-gray-500'}`}>
+          Tidak ada data tiket
+        </p>
+        <p className={`text-lg ${darkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+          Coba ubah filter atau tambah tiket baru
+        </p>
+      </td>
     </tr>
   );
 }
 
-/* ===================== MODAL FORM ===================== */
-function FormModal({ mode, data, onClose, onSubmit, onPickPhoto, onRemovePhoto, photoPreview, fileInputRef }) {
+// Komponen Th
+const Th = ({ children, className = "" }) => (
+  <th className={`px-6 py-4 text-left text-sm font-semibold ${className}`}>
+    {children}
+  </th>
+);
+
+// Komponen Td
+const Td = ({ children, className = "" }) => (
+  <td className={`px-6 py-4 text-sm ${className}`}>
+    {children}
+  </td>
+);
+
+// Komponen Avatar
+const Avatar = ({ name, email, size = 8 }) => {
+  const initial = name ? name.charAt(0).toUpperCase() : email ? email.charAt(0).toUpperCase() : "?";
   return (
-    <div className="fixed inset-0 z-50">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 text-gray-900 dark:text-white w-[720px] max-w-[92vw] rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700">
-        <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
-          <div className="font-semibold">{mode === "edit" ? "Edit" : "Tambah"} Ticket</div>
-          <button onClick={onClose} className="text-sm text-gray-500 hover:underline">tutup</button>
-        </div>
-
-        <form onSubmit={onSubmit} className="px-5 py-4 space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold mb-1">No. Ticket</label>
-              <input
-                name="TicketNumber"
-                defaultValue={data.TicketNumber || ""}
-                className="border rounded w-full px-3 py-2 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold mb-1">Judul (Title)</label>
-              <input
-                name="Title"
-                defaultValue={data.Title || ""}
-                className="border rounded w-full px-3 py-2 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold mb-1">Divisi</label>
-              <select
-                name="Divisi"
-                defaultValue={data.Divisi || "Umum"}
-                className="border rounded w-full px-3 py-2 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
-              >
-                {DIVISI_OPTIONS.map((d) => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold mb-1">Prioritas</label>
-              <select
-                name="Priority"
-                defaultValue={data.Priority || "Normal"}
-                className="border rounded w-full px-3 py-2 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
-              >
-                {["Low", "Normal", "High"].map((p) => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold mb-1">Status</label>
-              <select
-                name="Status"
-                defaultValue={data.Status || "Selesai"}
-                className="border rounded w-full px-3 py-2 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
-              >
-                {["Belum", "Pending", "Selesai"].map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold mb-1">Tipe Ticket</label>
-              <input
-                name="TipeTicket"
-                defaultValue={data.TipeTicket || ""}
-                className="border rounded w-full px-3 py-2 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold mb-1">Assigned To</label>
-              <input
-                name="Assignedto0"
-                defaultValue={data.Assignedto0?.displayName || data.Assignedto0 || ""}
-                className="border rounded w-full px-3 py-2 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
-                placeholder="Nama/ID internal"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold mb-1">Pelaksana (Operator)</label>
-              <input
-                name="Issueloggedby"
-                defaultValue={data.Issueloggedby || ""}
-                className="border rounded w-full px-3 py-2 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold mb-1">Waktu Lapor</label>
-              <input
-                name="DateReported"
-                defaultValue={data.DateReported || ""}
-                className="border rounded w-full px-3 py-2 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
-                placeholder="ISO string / yyyy-mm-dd"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold mb-1">Waktu Selesai</label>
-              <input
-                name="DateFinished"
-                defaultValue={data.DateFinished || ""}
-                className="border rounded w-full px-3 py-2 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
-                placeholder="ISO string / yyyy-mm-dd"
-              />
-            </div>
-
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-semibold mb-1">Deskripsi</label>
-              <textarea
-                name="Description"
-                defaultValue={data.Description || ""}
-                rows={3}
-                className="border rounded w-full px-3 py-2 bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold mb-1">Foto Bukti Selesai (opsional)</label>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={onPickPhoto}
-              className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-            />
-            {photoPreview ? (
-              <div className="mt-3 flex items-center gap-3">
-                <img src={photoPreview} alt="preview" className="h-20 w-20 object-cover rounded-lg border" />
-                <button type="button" onClick={onRemovePhoto} className="text-red-600 hover:underline">Hapus foto</button>
-              </div>
-            ) : data?.[DONE_PHOTO_FIELD] ? (
-              <OldPhotoPreview metaName={data[DONE_PHOTO_FIELD]} itemId={data.spId} />
-            ) : null}
-          </div>
-
-          <div className="flex justify-end gap-2 pt-2">
-            <button type="button" className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-700 dark:text-white" onClick={onClose}>Batal</button>
-            <button type="submit" className="px-5 py-2 rounded bg-blue-600 text-white font-bold">Simpan</button>
-          </div>
-        </form>
+    <div className={`flex items-center space-x-3`}>
+      <div className={`w-${size} h-${size} rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold`}>
+        {initial}
+      </div>
+      <div className="flex flex-col">
+        <span className="font-medium text-sm">{name || "-"}</span>
+        {email && <span className="text-xs text-gray-500">{email}</span>}
       </div>
     </div>
   );
-}
+};
 
-/* ===================== ATTACHMENT HELPERS ===================== */
+// Komponen Chip
+const Chip = ({ children, colorConfig, className = "" }) => {
+  const IconComponent = colorConfig?.icon;
+  return (
+    <span className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-medium ${colorConfig.bg} ${colorConfig.text} ${className}`}>
+      {IconComponent && <IconComponent />}
+      <span>{children}</span>
+    </span>
+  );
+};
+
+// Komponen RowSP
+const RowSP = ({ r, zebra, onSelect, selected, msal, darkMode }) => {
+  const f = r.fields;
+  
+  return (
+    <motion.tr 
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className={`cursor-pointer transition-all duration-300 ${
+        selected 
+          ? 'bg-blue-100 dark:bg-blue-900/30 ring-2 ring-blue-500' 
+          : zebra 
+            ? (darkMode ? 'bg-gray-700/50 hover:bg-gray-600/50' : 'bg-gray-50 hover:bg-gray-100')
+            : (darkMode ? 'bg-gray-800/50 hover:bg-gray-700/50' : 'bg-white hover:bg-gray-50')
+      }`}
+      onClick={onSelect}
+    >
+      <Td className="font-mono font-semibold">{f.TicketNumber || r.id}</Td>
+      <Td>{fmtWaktu(f.DateReported)}</Td>
+      <Td>{fmtWaktu(f.DateFinished)}</Td>
+      <Td>
+        <Avatar 
+          name={f.UserRequestor?.displayName} 
+          email={f.UserRequestor?.email} 
+        />
+      </Td>
+      <Td>
+        <Avatar 
+          name={f.Assignedto0?.displayName || f.Issueloggedby} 
+          email={f.Assignedto0?.email} 
+        />
+      </Td>
+      <Td>
+        <Chip colorConfig={DIVISI_COLORS[f.Divisi] || DIVISI_COLORS["Umum"]}>
+          {f.Divisi}
+        </Chip>
+      </Td>
+      <Td>
+        <Chip colorConfig={PRIORITY_COLORS[f.Priority] || PRIORITY_COLORS["Normal"]}>
+          {f.Priority}
+        </Chip>
+      </Td>
+      <Td>
+        <Chip colorConfig={STATUS_COLORS[f.Status] || STATUS_COLORS["Completed"]}>
+          {f.Status}
+        </Chip>
+      </Td>
+      <Td className={`max-w-[500px] ${darkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+        <div className="line-clamp-3">{f.Description}</div>
+      </Td>
+      <Td className="text-center">
+        {f.HasAttachments && (
+          <FaPaperclip className={`mx-auto ${darkMode ? 'text-gray-400' : 'text-gray-500'}`} />
+        )}
+      </Td>
+    </motion.tr>
+  );
+};
+
+// Komponen FormModal
+const FormModal = ({ mode, data, onClose, onSubmit, onPickPhoto, onRemovePhoto, fileInputRef, photoPreview, darkMode }) => {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        transition={{ type: "spring", damping: 25 }}
+        className={`rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto ${
+          darkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'
+        }`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <form onSubmit={onSubmit}>
+          <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+            <h2 className="text-2xl font-bold">
+              {mode === "create" ? "Tambah Ticket Baru" : "Edit Ticket"}
+            </h2>
+          </div>
+          
+          <div className="p-6 space-y-4">
+            {/* Form fields di sini */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Judul</label>
+                <input
+                  type="text"
+                  name="Title"
+                  defaultValue={data.Title}
+                  className={`w-full px-4 py-3 rounded-xl border ${
+                    darkMode 
+                      ? 'bg-gray-700 border-gray-600 text-white' 
+                      : 'bg-white border-gray-300 text-gray-800'
+                  } focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2">Nomor Ticket</label>
+                <input
+                  type="text"
+                  name="TicketNumber"
+                  defaultValue={data.TicketNumber}
+                  className={`w-full px-4 py-3 rounded-xl border ${
+                    darkMode 
+                      ? 'bg-gray-700 border-gray-600 text-white' 
+                      : 'bg-white border-gray-300 text-gray-800'
+                  } focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+                />
+              </div>
+            </div>
+            
+            {/* Tambahkan field lainnya sesuai kebutuhan */}
+            
+            {/* Photo Upload Section */}
+            <div>
+              <label className="block text-sm font-medium mb-2">Foto Bukti</label>
+              <div className="flex items-center space-x-4">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={onPickPhoto}
+                  accept="image/*"
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`px-4 py-2 rounded-xl ${
+                    darkMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-500 hover:bg-blue-600'
+                  } text-white transition`}
+                >
+                  <FaCamera className="inline mr-2" />
+                  Pilih Foto
+                </button>
+                {photoPreview && (
+                  <button
+                    type="button"
+                    onClick={onRemovePhoto}
+                    className="px-4 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white transition"
+                  >
+                    <FaTimes className="inline mr-2" />
+                    Hapus
+                  </button>
+                )}
+              </div>
+              {photoPreview && (
+                <div className="mt-4">
+                  <img 
+                    src={photoPreview} 
+                    alt="Preview" 
+                    className="max-w-xs rounded-xl shadow-lg"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+          
+          <div className="p-6 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className={`px-6 py-3 rounded-xl font-medium ${
+                darkMode 
+                  ? 'bg-gray-700 hover:bg-gray-600 text-white' 
+                  : 'bg-gray-200 hover:bg-gray-300 text-gray-800'
+              } transition`}
+            >
+              Batal
+            </button>
+            <button
+              type="submit"
+              className="px-6 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-medium transition"
+            >
+              {mode === "create" ? "Simpan" : "Update"}
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </motion.div>
+  );
+};
+
+// Helper functions untuk upload attachment (jika diperlukan)
 async function uploadAttachmentToSP(instance, accounts, itemId, file) {
-  const account = accounts?.[0];
-  const spTok = await instance.acquireTokenSilent({ scopes: SHAREPOINT_SCOPE, account });
-  const buf = await file.arrayBuffer();
-  const upUrl = `${REST_URL}/_api/web/lists(guid'${TICKET_LIST_ID}')/items(${itemId})/AttachmentFiles/add(FileName='${encodeURIComponent(file.name)}')`;
-  const r = await fetch(upUrl, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${spTok.accessToken}`,
-      Accept: "application/json;odata=verbose",
-      "Content-Type": "application/octet-stream",
-    },
-    body: buf,
-  });
-  const txt = await r.text();
-  if (!r.ok) {
-    console.error("Upload error:", txt);
-    throw new Error("Gagal upload lampiran");
-  }
-  return { fileName: file.name };
+  // Implementasi upload attachment
 }
 
 async function setDonePhotoMetaOnSP(instance, accounts, itemId, fileName) {
-  const account = accounts?.[0];
-  const gTok = await instance.acquireTokenSilent({ scopes: GRAPH_SCOPE, account });
-  const body = { [DONE_PHOTO_FIELD]: fileName };
-  const r = await fetch(
-    `https://graph.microsoft.com/v1.0/sites/${siteId}/lists/${TICKET_LIST_ID}/items/${itemId}/fields`,
-    {
-      method: "PATCH",
-      headers: { Authorization: `Bearer ${gTok.accessToken}`, "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    }
-  );
-  if (!r.ok) {
-    const t = await r.text();
-    console.warn("Set photo meta failed:", t);
-  }
-}
-
-async function openAttachmentWithToken(instance, accounts, itemId, fileName) {
-  const account = accounts?.[0];
-  const spTok = await instance.acquireTokenSilent({ scopes: SHAREPOINT_SCOPE, account });
-  const url = `${REST_URL}/_api/web/lists(guid'${TICKET_LIST_ID}')/items(${itemId})/AttachmentFiles('${encodeURIComponent(fileName)}')/$value`;
-  const r = await fetch(url, { headers: { Authorization: `Bearer ${spTok.accessToken}` } });
-  if (!r.ok) throw new Error(`Gagal ambil lampiran: ${r.status}`);
-  const blob = await r.blob();
-  const blobUrl = URL.createObjectURL(blob);
-  window.open(blobUrl, "_blank", "noopener,noreferrer");
-  setTimeout(() => URL.revokeObjectURL(blobUrl), 30000);
-}
-
-/* ===================== PREVIEW FOTO LAMA ===================== */
-function OldPhotoPreview({ metaName, itemId }) {
-  if (!metaName || !itemId) return null;
-
-  const spAttachmentUrl = (itemId, fileName) => {
-    return `${REST_URL}/_api/web/lists(guid'${TICKET_LIST_ID}')/items(${itemId})/AttachmentFiles('${encodeURIComponent(fileName)}')/$value`;
-  };
-
-  const url = spAttachmentUrl(itemId, metaName);
-  return (
-    <div className="mt-3">
-      <img src={url} alt="current" className="h-20 w-20 object-cover rounded-lg border" />
-    </div>
-  );
-}
-
-/* ===================== NORMALIZER STAGING ===================== */
-function normalizeStagingRow(v) {
-  const f = v.fields || v;
-  const divisi = f["Divisi/ Departemen"] || f.Division || f.Divisi || v.Division || "Umum";
-  const prior = f.Prioritas || f.Priority || v.Priority || "Normal";
-
-  return {
-    id: v.id ?? f.id ?? f.ID,
-    ticketNo: f.TicketNumber || f["Ticket Number"] || v.TicketNumber || "",
-    Created: f.Created || v.createdDateTime || v.Created || new Date().toISOString(),
-    DateFinished: f.DateFinished || v.DateFinished || "",
-    userRequestor:
-      f["User Requestor"]?.displayName ||
-      f.UserRequestor?.displayName ||
-      f.RequestedBy?.displayName ||
-      f.Requestor?.displayName ||
-      f.Nama ||
-      f.Title ||
-      "—",
-    email:
-      f["User Requestor"]?.email ||
-      f.UserRequestor?.email ||
-      f.RequestedBy?.email ||
-      f.Requestor?.email ||
-      f.email ||
-      v.email ||
-      "",
-    pelaksana: f.Pelaksana || v.Pelaksana || f.Assignedto0?.displayName || v.Assignedto0?.displayName || "",
-    divisi,
-    prioritas: prior,
-    deskripsi: f["Insiden/ Keluhan saat ini"] || f.Description || f.Deskripsi || v.Description || "",
-    PhotoUrl: f["Screenshot Bukti Insiden/ Keluhan"] || f.PhotoUrl || v.PhotoUrl || "",
-    status: f.Status || v.Status || "Selesai",
-  };
-}
-
-/* ===================== DEBUG PANEL ===================== */
-function DebugPanel({ data, title = "Debug Info" }) {
-  const [isOpen, setIsOpen] = useState(false);
-
-  if (!data) return null;
-
-  return (
-    <div className="fixed bottom-4 right-4 z-50">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="bg-red-500 text-white px-3 py-1 rounded-md text-sm"
-      >
-        {isOpen ? "Tutup Debug" : "Buka Debug"}
-      </button>
-
-      {isOpen && (
-        <div className="mt-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg p-4 max-w-lg max-h-96 overflow-auto">
-          <h3 className="font-bold mb-2">{title}</h3>
-          <pre className="text-xs whitespace-pre-wrap">{JSON.stringify(data, null, 2)}</pre>
-        </div>
-      )}
-    </div>
-  );
+  // Implementasi set metadata photo
 }

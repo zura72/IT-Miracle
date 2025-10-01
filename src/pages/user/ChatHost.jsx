@@ -136,7 +136,7 @@ async function createTicket({ name, division = "", description, photo }) {
     name: String(name || "User").trim(),
     division: String(division || "Umum").trim(),
     description: String(description || "").trim(),
-    priority: String(division).trim().toLowerCase().includes("bod (urgent)") ? "Urgent" : "Normal"
+    priority: String(division).trim().toLowerCase().includes("bod (urgent)") ? "High" : "Normal"
   };
 
   // Validasi field required
@@ -276,7 +276,7 @@ function SuccessBig({ title = "Berhasil", subtitle = "" }) {
 }
 
 function RecapCard({ name, complaint, division, datetime }) {
-  const priority = String(division).trim().toLowerCase().includes("bod (urgent)") ? "Urgent" : "Normal";
+  const priority = String(division).trim().toLowerCase().includes("bod (urgent)") ? "High" : "Normal";
   return (
     <div className="recap card-pop enter-pop">
       <div className="recap-title">Rekap Keluhan</div>
