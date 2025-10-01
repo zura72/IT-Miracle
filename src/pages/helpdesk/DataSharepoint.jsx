@@ -1,4 +1,4 @@
-// src/pages/helpdesk/TicketSolved.jsx
+// src/pages/helpdesk/DataSharepoint.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useMsal } from "@azure/msal-react";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -32,30 +32,58 @@ const TICKET_LIST_NAME_FOR_ATTACH = "Tickets";
 const DONE_PHOTO_FIELD = "ScreenshotBuktiTicketsudahDilaku";
 const PROOF_IMAGES_FIELD = "Images";
 
-// List Divisi yang Baru - Mengikuti struktur dari kode Anda
+// List Divisi yang Baru - Diperbaiki dan disusun rapi
 const DIVISI_OPTIONS = [
-  "IT & System", "Business Development", "Direksi", "Engineering", "Finance & Accounting",
-  "Human Capital", "Legal", "Marketing & Sales", "Operation & Maintenance",
-  "Procurement & Logistic", "Project", "QHSE", "Sekper", "Warehouse", "Umum",
+  "Sekretariat Perusahaan",
+  "Internal Audit", 
+  "Keuangan",
+  "Akutansi",
+  "HCM",
+  "Manajemen Resiko",
+  "Legal",
+  "Pemasaran",
+  "Produksi & Peralatan",
+  "Pengembangan Bisnis & Portofolio",
+  "Pengendalian Proyek & SCM",
+  "TI & Sistem",
+  "QHSE",
+  "Produksi & Peralatan WS 1",
+  "Produksi & Peralatan WS 2",
+  "WS 1",
+  "WS 2",
+  "BOD",
+  "WWE",
+  "WSE",
+  "Project Coordinator",
+  "Proyek",
+  "Umum"
 ];
 
-// Warna untuk setiap divisi
+// Warna untuk setiap divisi - Lebih Banyak Variasi
 const DIVISI_COLORS = {
-  "IT & System": { bg: "bg-violet-500", hover: "hover:bg-violet-600", text: "text-white", gradient: "from-violet-500 to-violet-600" },
-  "Business Development": { bg: "bg-cyan-500", hover: "hover:bg-cyan-600", text: "text-white", gradient: "from-cyan-500 to-cyan-600" },
-  "Direksi": { bg: "bg-red-600", hover: "hover:bg-red-700", text: "text-white", gradient: "from-red-600 to-red-700" },
-  "Engineering": { bg: "bg-orange-500", hover: "hover:bg-orange-600", text: "text-white", gradient: "from-orange-500 to-orange-600" },
-  "Finance & Accounting": { bg: "bg-green-500", hover: "hover:bg-green-600", text: "text-white", gradient: "from-green-500 to-green-600" },
-  "Human Capital": { bg: "bg-pink-500", hover: "hover:bg-pink-600", text: "text-white", gradient: "from-pink-500 to-pink-600" },
+  "Sekretariat Perusahaan": { bg: "bg-purple-500", hover: "hover:bg-purple-600", text: "text-white", gradient: "from-purple-500 to-purple-600" },
+  "Internal Audit": { bg: "bg-indigo-500", hover: "hover:bg-indigo-600", text: "text-white", gradient: "from-indigo-500 to-indigo-600" },
+  "Keuangan": { bg: "bg-green-500", hover: "hover:bg-green-600", text: "text-white", gradient: "from-green-500 to-green-600" },
+  "Akutansi": { bg: "bg-emerald-500", hover: "hover:bg-emerald-600", text: "text-white", gradient: "from-emerald-500 to-emerald-600" },
+  "HCM": { bg: "bg-pink-500", hover: "hover:bg-pink-600", text: "text-white", gradient: "from-pink-500 to-pink-600" },
+  "Manajemen Resiko": { bg: "bg-red-500", hover: "hover:bg-red-600", text: "text-white", gradient: "from-red-500 to-red-600" },
   "Legal": { bg: "bg-blue-500", hover: "hover:bg-blue-600", text: "text-white", gradient: "from-blue-500 to-blue-600" },
-  "Marketing & Sales": { bg: "bg-teal-500", hover: "hover:bg-teal-600", text: "text-white", gradient: "from-teal-500 to-teal-600" },
-  "Operation & Maintenance": { bg: "bg-amber-500", hover: "hover:bg-amber-600", text: "text-white", gradient: "from-amber-500 to-amber-600" },
-  "Procurement & Logistic": { bg: "bg-indigo-500", hover: "hover:bg-indigo-600", text: "text-white", gradient: "from-indigo-500 to-indigo-600" },
-  "Project": { bg: "bg-purple-500", hover: "hover:bg-purple-600", text: "text-white", gradient: "from-purple-500 to-purple-600" },
+  "Pemasaran": { bg: "bg-teal-500", hover: "hover:bg-teal-600", text: "text-white", gradient: "from-teal-500 to-teal-600" },
+  "Produksi & Peralatan": { bg: "bg-orange-500", hover: "hover:bg-orange-600", text: "text-white", gradient: "from-orange-500 to-orange-600" },
+  "Pengembangan Bisnis & Portofolio": { bg: "bg-cyan-500", hover: "hover:bg-cyan-600", text: "text-white", gradient: "from-cyan-500 to-cyan-600" },
+  "Pengendalian Proyek & SCM": { bg: "bg-amber-500", hover: "hover:bg-amber-600", text: "text-white", gradient: "from-amber-500 to-amber-600" },
+  "TI & Sistem": { bg: "bg-violet-500", hover: "hover:bg-violet-600", text: "text-white", gradient: "from-violet-500 to-violet-600" },
   "QHSE": { bg: "bg-lime-500", hover: "hover:bg-lime-600", text: "text-white", gradient: "from-lime-500 to-lime-600" },
-  "Sekper": { bg: "bg-gray-500", hover: "hover:bg-gray-600", text: "text-white", gradient: "from-gray-500 to-gray-600" },
-  "Warehouse": { bg: "bg-yellow-500", hover: "hover:bg-yellow-600", text: "text-white", gradient: "from-yellow-500 to-yellow-600" },
-  "Umum": { bg: "bg-gray-400", hover: "hover:bg-gray-500", text: "text-white", gradient: "from-gray-400 to-gray-500" },
+  "Produksi & Peralatan WS 1": { bg: "bg-rose-500", hover: "hover:bg-rose-600", text: "text-white", gradient: "from-rose-500 to-rose-600" },
+  "Produksi & Peralatan WS 2": { bg: "bg-fuchsia-500", hover: "hover:bg-fuchsia-600", text: "text-white", gradient: "from-fuchsia-500 to-fuchsia-600" },
+  "WS 1": { bg: "bg-sky-500", hover: "hover:bg-sky-600", text: "text-white", gradient: "from-sky-500 to-sky-600" },
+  "WS 2": { bg: "bg-cyan-500", hover: "hover:bg-cyan-600", text: "text-white", gradient: "from-cyan-500 to-cyan-600" },
+  "BOD": { bg: "bg-red-600", hover: "hover:bg-red-700", text: "text-white", gradient: "from-red-600 to-red-700" },
+  "WWE": { bg: "bg-blue-600", hover: "hover:bg-blue-700", text: "text-white", gradient: "from-blue-600 to-blue-700" },
+  "WSE": { bg: "bg-green-600", hover: "hover:bg-green-700", text: "text-white", gradient: "from-green-600 to-green-700" },
+  "Project Coordinator": { bg: "bg-purple-600", hover: "hover:bg-purple-700", text: "text-white", gradient: "from-purple-600 to-purple-700" },
+  "Proyek": { bg: "bg-indigo-600", hover: "hover:bg-indigo-700", text: "text-white", gradient: "from-indigo-600 to-indigo-700" },
+  "Umum": { bg: "bg-gray-500", hover: "hover:bg-gray-600", text: "text-white", gradient: "from-gray-500 to-gray-600" },
 };
 
 // Warna untuk prioritas
@@ -67,7 +95,7 @@ const PRIORITY_COLORS = {
 
 // Warna untuk status
 const STATUS_COLORS = {
-  "Selesai": { bg: "bg-green-500", hover: "hover:bg-green-600", text: "text-white", icon: FaCheck, gradient: "from-green-500 to-green-600" },
+  "Completed": { bg: "bg-green-500", hover: "hover:bg-green-600", text: "text-white", icon: FaCheck, gradient: "from-green-500 to-green-600" },
   "Pending": { bg: "bg-yellow-500", hover: "hover:bg-yellow-600", text: "text-white", icon: FaExclamationCircle, gradient: "from-yellow-500 to-yellow-600" },
   "Belum": { bg: "bg-red-500", hover: "hover:bg-red-600", text: "text-white", icon: FaTimes, gradient: "from-red-500 to-red-600" },
 };
@@ -190,7 +218,7 @@ function buildFieldsPayload(src) {
     TicketNumber: src.TicketNumber || "",
     Description: src.Description || "",
     Priority: src.Priority || "Normal",
-    Status: src.Status || "Selesai",
+    Status: src.Status || "Completed",
     Divisi: src.Divisi || "Umum",
     DateReported: src.DateReported || undefined,
     DateFinished: src.DateFinished || undefined,
@@ -200,12 +228,12 @@ function buildFieldsPayload(src) {
   };
 }
 
-// GlassCard Component dengan dark mode support
-const GlassCard = ({ children, className = '' }) => (
+// GlassCard Component
+const GlassCard = ({ children, className = '', delay = 0 }) => (
   <motion.div 
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.4, ease: "easeOut" }}
+    transition={{ duration: 0.4, delay, ease: "easeOut" }}
     className={`rounded-2xl backdrop-blur-lg border border-opacity-20 
       bg-white/80 border-gray-300 shadow-2xl shadow-blue-100 text-gray-800
       dark:bg-gray-800/70 dark:border-gray-600 dark:shadow-2xl dark:shadow-black/30 dark:text-white
@@ -215,7 +243,7 @@ const GlassCard = ({ children, className = '' }) => (
   </motion.div>
 );
 
-// Animated Filter Button Component
+// Animated Filter Button Component - Lebih Smooth
 const AnimatedFilterButton = ({ value, onClick, isActive, colorConfig, children }) => {
   const IconComponent = colorConfig?.icon;
   
@@ -234,6 +262,7 @@ const AnimatedFilterButton = ({ value, onClick, isActive, colorConfig, children 
           : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600'
       }`}
     >
+      {/* Animated background for active state */}
       {isActive && (
         <motion.div
           initial={{ scale: 0 }}
@@ -260,7 +289,7 @@ const AnimatedFilterButton = ({ value, onClick, isActive, colorConfig, children 
   );
 };
 
-// Enhanced Filter Section Component
+// Enhanced Filter Section Component - Diperbaiki untuk animasi lebih smooth
 const EnhancedFilterSection = ({ title, icon: Icon, isOpen, onToggle, children }) => {
   return (
     <motion.div 
@@ -339,20 +368,10 @@ const EnhancedFilterSection = ({ title, icon: Icon, isOpen, onToggle, children }
 };
 
 /* ===================== KOMPONEN UTAMA ===================== */
-export default function TicketSolved() {
+export default function DataSharepoint() {
   const { instance, accounts } = useMsal();
   const navigate = useNavigate();
   const location = useLocation();
-
-  const queryParams = new URLSearchParams(location.search);
-  const initialTab = queryParams.get('tab') || 'sp';
-  const [tab, setTab] = useState(initialTab);
-
-  useEffect(() => {
-    const params = new URLSearchParams();
-    params.set('tab', tab);
-    navigate({ search: params.toString() }, { replace: true });
-  }, [tab, navigate]);
 
   // State SharePoint
   const [rowsSP, setRowsSP] = useState([]);
@@ -371,8 +390,6 @@ export default function TicketSolved() {
     status: true
   });
   const fileInputRef = useRef(null);
-
-  const [debugData, setDebugData] = useState(null);
 
   /* ====== Derived Data ====== */
   const filteredSP = useMemo(() => {
@@ -397,8 +414,8 @@ export default function TicketSolved() {
 
   /* ====== Effects ====== */
   useEffect(() => {
-    if (tab === "sp") fetchFromSP();
-  }, [tab]);
+    fetchFromSP();
+  }, []);
 
   /* ===================== SHAREPOINT API ===================== */
   async function fetchFromSP() {
@@ -440,7 +457,7 @@ export default function TicketSolved() {
       open: true, mode: "create",
       data: {
         Title: "", TicketNumber: "", Description: "",
-        Priority: "Normal", Status: "Selesai", Divisi: "Umum",
+        Priority: "Normal", Status: "Completed", Divisi: "Umum",
         DateReported: new Date().toISOString(),
         DateFinished: new Date().toISOString(),
         TipeTicket: "", Assignedto0: "", Issueloggedby: "",
@@ -488,7 +505,7 @@ export default function TicketSolved() {
       const data = Object.fromEntries(formData.entries());
       const fields = buildFieldsPayload({
         Title: data.Title, TicketNumber: data.TicketNumber, Description: data.Description,
-        Priority: data.Priority || "Normal", Status: data.Status || "Selesai",
+        Priority: data.Priority || "Normal", Status: data.Status || "Completed",
         Divisi: data.Divisi || "Umum", DateReported: data.DateReported || undefined,
         DateFinished: data.DateFinished || undefined, TipeTicket: data.TipeTicket || undefined,
         Assignedto0: data.Assignedto0 || undefined, Issueloggedby: data.Issueloggedby || undefined,
@@ -511,6 +528,11 @@ export default function TicketSolved() {
           { method: "PATCH", headers: { Authorization: `Bearer ${gTok.accessToken}`, "Content-Type": "application/json" }, body: JSON.stringify(fields) }
         );
         if (!res.ok) throw new Error(await res.text());
+      }
+
+      if (itemId && photoFile) {
+        const saved = await uploadAttachmentToSP(instance, accounts, itemId, photoFile);
+        await setDonePhotoMetaOnSP(instance, accounts, itemId, saved.fileName);
       }
 
       setNotif(modal.mode === "create" ? "Berhasil menambahkan data." : "Perubahan tersimpan.");
@@ -566,9 +588,54 @@ export default function TicketSolved() {
     setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
 
+  /* ===================== PRINT FUNCTIONS ===================== */
+  function handlePrintSP() {
+    const items = filteredSP;
+    const head = `
+      <meta charset="utf-8"/>
+      <title>Ticket Solved (SharePoint)</title>
+      <style>
+        @page { size: A4 landscape; margin: 12mm; }
+        body { font: 12px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; color:#000; }
+        h1 { margin:0 0 8px; font-size:18px; }
+        table { width:100%; border-collapse:collapse; border:1.5pt solid #000; }
+        th,td { border:0.9pt solid #000; padding:6px 8px; vertical-align:top; }
+        thead th { background:#f3f4f6; text-align:left; }
+      </style>
+    `;
+    const body = items.map(it => {
+      const f = it.fields;
+      const req = f.UserRequestor?.displayName || "";
+      const exe = (f.Assignedto0?.displayName) || f.Issueloggedby || "";
+      return `
+        <tr>
+          <td>${esc(f.TicketNumber)}</td>
+          <td>${esc(fmtWaktu(f.DateReported))}</td>
+          <td>${esc(fmtWaktu(f.DateFinished))}</td>
+          <td>${esc(req)}</td>
+          <td>${esc(exe)}</td>
+          <td>${esc(f.Divisi)}</td>
+          <td>${esc(f.Priority)}</td>
+          <td>${esc(f.Status)}</td>
+          <td>${esc(f.Description)}</td>
+        </tr>`;
+    }).join("");
+    const html = `<!doctype html><html><head>${head}</head><body>
+      <h1>Ticket Solved (SharePoint)</h1>
+      <table>
+        <thead><tr>
+          <th>No. Ticket</th><th>Waktu Lapor</th><th>Waktu Selesai</th><th>User Requestor</th><th>Pelaksana</th>
+          <th>Divisi</th><th>Prioritas</th><th>Status</th><th>Deskripsi</th>
+        </tr></thead><tbody>${body}</tbody></table>
+      <script>onload=()=>{print();setTimeout(()=>close(),300)}</script>
+    </body></html>`;
+    const w = window.open("", "_blank", "noopener,noreferrer");
+    w.document.open(); w.document.write(html); w.document.close();
+  }
+
   /* ===================== RENDER ===================== */
   return (
-    <div className="min-h-screen py-6 bg-gray-100 dark:bg-gray-900 text-gray-900 dark:text-white transition-colors duration-300">
+    <div className="min-h-screen py-6 transition-colors duration-300 bg-gradient-to-br from-blue-50 via-white to-gray-100 dark:bg-gradient-to-br dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
       
       {/* Notification */}
       <AnimatePresence>
@@ -578,7 +645,7 @@ export default function TicketSolved() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -50 }}
             transition={{ duration: 0.3, ease: "easeOut" }}
-            className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 px-6 py-4 rounded-2xl shadow-2xl font-semibold transition-all duration-300 cursor-pointer bg-emerald-600 dark:bg-emerald-700 text-white max-w-md text-center"
+            className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 px-6 py-4 rounded-2xl shadow-2xl font-semibold transition-all duration-300 cursor-pointer bg-green-600 dark:bg-green-700 text-white max-w-md text-center"
             onClick={() => setNotif("")}
           >
             {notif}
@@ -586,7 +653,8 @@ export default function TicketSolved() {
         )}
       </AnimatePresence>
 
-      <div className="w-full px-8">
+      {/* Container utama - Lebar penuh */}
+      <div className="w-full px-8 ml-0">
         <GlassCard className="p-8">
           
           {/* Header Section */}
@@ -597,7 +665,7 @@ export default function TicketSolved() {
             className="flex flex-col lg:flex-row lg:items-center justify-between mb-8 gap-6"
           >
             <div className="flex-1">
-              <h1 className="text-4xl font-bold text-[#215ba6] dark:text-blue-400">
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
                 Ticket Solved
               </h1>
               <p className="mt-2 text-xl text-gray-600 dark:text-gray-300">
@@ -631,347 +699,357 @@ export default function TicketSolved() {
             </div>
           </motion.div>
 
-          {/* ===== SharePoint Content ===== */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.4, ease: "easeOut" }}
+          {/* Search and Filter Section */}
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.2, ease: "easeOut" }}
+            className="mb-8"
           >
-            {/* Search and Filter Section */}
-            <div className="mb-8">
-              <div className="flex flex-col lg:flex-row gap-4 mb-6">
-                {/* Search Bar */}
-                <div className="flex-1">
-                  <div className="relative rounded-xl bg-white dark:bg-gray-700 shadow-lg">
-                    <FaSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 text-lg" />
-                    <input
-                      type="text"
-                      placeholder="Cari tiket berdasarkan nomor, deskripsi, user..."
-                      value={qSP}
-                      onChange={(e) => setQSP(e.target.value)}
-                      className="w-full pl-12 pr-4 py-4 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                    />
-                  </div>
+            <div className="flex flex-col lg:flex-row gap-4 mb-6">
+              {/* Search Bar */}
+              <div className="flex-1">
+                <div className="relative rounded-xl bg-white dark:bg-gray-700 shadow-lg">
+                  <FaSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 text-lg" />
+                  <input
+                    type="text"
+                    placeholder="Cari tiket berdasarkan nomor, deskripsi, user..."
+                    value={qSP}
+                    onChange={(e) => setQSP(e.target.value)}
+                    className="w-full pl-12 pr-4 py-4 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent transition text-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                  />
                 </div>
+              </div>
 
-                {/* Filter Toggle */}
+              {/* Filter Toggle */}
+              <motion.button 
+                whileHover={{ scale: 1.05, y: -2 }}
+                whileTap={{ scale: 0.95 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                onClick={() => setShowFilters(!showFilters)}
+                className="px-6 py-4 rounded-xl font-medium flex items-center justify-center space-x-3 bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-700 shadow-lg"
+              >
+                <FaFilter className="text-lg" />
+                <span className="text-lg">{showFilters ? "Sembunyikan Filter" : "Tampilkan Filter"}</span>
+              </motion.button>
+
+              {/* Print Button */}
+              <motion.button 
+                whileHover={{ scale: 1.05, y: -2 }}
+                whileTap={{ scale: 0.95 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                className="px-6 py-4 rounded-xl font-medium flex items-center space-x-3 border border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-700 dark:text-white dark:hover:bg-gray-600"
+                onClick={handlePrintSP}
+              >
+                <FaPrint className="text-lg" />
+                <span className="text-lg">Print</span>
+              </motion.button>
+            </div>
+
+            {/* Active Filters */}
+            {(filterSP.Divisi || filterSP.Priority || filterSP.Status) && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, ease: "easeOut" }}
+                className="flex flex-wrap gap-3 mb-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-700 dark:to-gray-600 rounded-2xl"
+              >
+                <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Filter Aktif:</span>
+                {filterSP.Divisi && (
+                  <motion.span 
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ duration: 0.3, type: "spring" }}
+                    className={`px-3 py-1 rounded-full text-sm font-medium ${DIVISI_COLORS[filterSP.Divisi]?.bg || 'bg-gray-500'} text-white flex items-center space-x-2`}
+                  >
+                    <span>{filterSP.Divisi}</span>
+                    <button onClick={() => setFilterSP(f => ({ ...f, Divisi: "" }))} className="hover:bg-white/20 rounded-full w-5 h-5 flex items-center justify-center">
+                      <FaTimes className="text-xs" />
+                    </button>
+                  </motion.span>
+                )}
+                {filterSP.Priority && (
+                  <motion.span 
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ duration: 0.3, type: "spring" }}
+                    className={`px-3 py-1 rounded-full text-sm font-medium ${PRIORITY_COLORS[filterSP.Priority]?.bg || 'bg-gray-500'} text-white flex items-center space-x-2`}
+                  >
+                    <span>{filterSP.Priority}</span>
+                    <button onClick={() => setFilterSP(f => ({ ...f, Priority: "" }))} className="hover:bg-white/20 rounded-full w-5 h-5 flex items-center justify-center">
+                      <FaTimes className="text-xs" />
+                    </button>
+                  </motion.span>
+                )}
+                {filterSP.Status && (
+                  <motion.span 
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ duration: 0.3, type: "spring" }}
+                    className={`px-3 py-1 rounded-full text-sm font-medium ${STATUS_COLORS[filterSP.Status]?.bg || 'bg-gray-500'} text-white flex items-center space-x-2`}
+                  >
+                    <span>{filterSP.Status}</span>
+                    <button onClick={() => setFilterSP(f => ({ ...f, Status: "" }))} className="hover:bg-white/20 rounded-full w-5 h-5 flex items-center justify-center">
+                      <FaTimes className="text-xs" />
+                    </button>
+                  </motion.span>
+                )}
+                <motion.button 
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={resetAllFilters}
+                  className="px-3 py-1 rounded-full bg-red-500 hover:bg-red-600 text-white text-sm font-medium flex items-center space-x-2"
+                >
+                  <FaTimes />
+                  <span>Reset Semua</span>
+                </motion.button>
+              </motion.div>
+            )}
+
+            {/* Filter Grid dengan Enhanced Collapsible - Diperbaiki untuk animasi lebih smooth */}
+            <AnimatePresence mode="wait">
+              {showFilters && (
+                <motion.div 
+                  key="filter-section"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ 
+                    opacity: 1, 
+                    height: "auto",
+                    transition: { 
+                      opacity: { duration: 0.4, ease: "easeOut" },
+                      height: { duration: 0.5, ease: "easeInOut" }
+                    }
+                  }}
+                  exit={{ 
+                    opacity: 0, 
+                    height: 0,
+                    transition: { 
+                      opacity: { duration: 0.3, ease: "easeIn" },
+                      height: { duration: 0.4, ease: "easeInOut" }
+                    }
+                  }}
+                  className="space-y-4 overflow-hidden"
+                >
+                  {/* Divisi Filter - Diperbaiki dengan animasi lebih smooth */}
+                  <EnhancedFilterSection
+                    title="Filter Divisi"
+                    icon={FaBuilding}
+                    isOpen={openSections.divisi}
+                    onToggle={() => toggleSection('divisi')}
+                  >
+                    <motion.div 
+                      layout
+                      className="flex flex-wrap gap-3"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.4, delay: 0.1, staggerChildren: 0.05 }}
+                    >
+                      {DIVISI_OPTIONS.map((divisi, index) => (
+                        <motion.div
+                          key={divisi}
+                          initial={{ opacity: 0, scale: 0.8, y: 10 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          transition={{ 
+                            duration: 0.3, 
+                            delay: index * 0.03,
+                            type: "spring",
+                            stiffness: 100
+                          }}
+                          whileHover={{ 
+                            scale: 1.05,
+                            transition: { duration: 0.2 }
+                          }}
+                        >
+                          <AnimatedFilterButton
+                            value={divisi}
+                            onClick={() => handleDivisiFilter(divisi)}
+                            isActive={filterSP.Divisi === divisi}
+                            colorConfig={DIVISI_COLORS[divisi]}
+                          >
+                            {divisi}
+                          </AnimatedFilterButton>
+                        </motion.div>
+                      ))}
+                    </motion.div>
+                  </EnhancedFilterSection>
+
+                  {/* Priority Filter */}
+                  <EnhancedFilterSection
+                    title="Filter Prioritas"
+                    icon={FaExclamationTriangle}
+                    isOpen={openSections.priority}
+                    onToggle={() => toggleSection('priority')}
+                  >
+                    <motion.div 
+                      layout
+                      className="flex flex-wrap gap-3"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.4, delay: 0.2, staggerChildren: 0.1 }}
+                    >
+                      {Object.keys(PRIORITY_COLORS).map((priority, index) => (
+                        <motion.div
+                          key={priority}
+                          initial={{ opacity: 0, scale: 0.8, y: 10 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          transition={{ 
+                            duration: 0.3, 
+                            delay: index * 0.1,
+                            type: "spring",
+                            stiffness: 100
+                          }}
+                          whileHover={{ 
+                            scale: 1.05,
+                            transition: { duration: 0.2 }
+                          }}
+                        >
+                          <AnimatedFilterButton
+                            value={priority}
+                            onClick={() => handlePriorityFilter(priority)}
+                            isActive={filterSP.Priority === priority}
+                            colorConfig={PRIORITY_COLORS[priority]}
+                          >
+                            {priority}
+                          </AnimatedFilterButton>
+                        </motion.div>
+                      ))}
+                    </motion.div>
+                  </EnhancedFilterSection>
+
+                  {/* Status Filter */}
+                  <EnhancedFilterSection
+                    title="Filter Status"
+                    icon={FaCheck}
+                    isOpen={openSections.status}
+                    onToggle={() => toggleSection('status')}
+                  >
+                    <motion.div 
+                      layout
+                      className="flex flex-wrap gap-3"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.4, delay: 0.3, staggerChildren: 0.1 }}
+                    >
+                      {Object.keys(STATUS_COLORS).map((status, index) => (
+                        <motion.div
+                          key={status}
+                          initial={{ opacity: 0, scale: 0.8, y: 10 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          transition={{ 
+                            duration: 0.3, 
+                            delay: index * 0.1,
+                            type: "spring",
+                            stiffness: 100
+                          }}
+                          whileHover={{ 
+                            scale: 1.05,
+                            transition: { duration: 0.2 }
+                          }}
+                        >
+                          <AnimatedFilterButton
+                            value={status}
+                            onClick={() => handleStatusFilter(status)}
+                            isActive={filterSP.Status === status}
+                            colorConfig={STATUS_COLORS[status]}
+                          >
+                            {status}
+                          </AnimatedFilterButton>
+                        </motion.div>
+                      ))}
+                    </motion.div>
+                  </EnhancedFilterSection>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+
+          {/* Action Buttons untuk selected item */}
+          {sel && (
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="flex gap-4 mb-6 p-6 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-700 dark:to-gray-600 rounded-2xl shadow-lg"
+            >
+              <div className="flex items-center space-x-3">
+                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="font-semibold text-lg">Ticket Terpilih: <span className="text-blue-600 dark:text-blue-400">{sel.fields.TicketNumber || sel.id}</span></span>
+              </div>
+              <div className="flex gap-3 ml-auto">
                 <motion.button 
                   whileHover={{ scale: 1.05, y: -2 }}
                   whileTap={{ scale: 0.95 }}
                   transition={{ duration: 0.2, ease: "easeOut" }}
-                  onClick={() => setShowFilters(!showFilters)}
-                  className="px-6 py-4 rounded-xl font-medium flex items-center justify-center space-x-3 bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-700 shadow-lg"
+                  className="px-6 py-3 rounded-xl bg-yellow-500 hover:bg-yellow-600 text-white font-medium flex items-center space-x-3 text-lg"
+                  onClick={openEdit}
                 >
-                  <FaFilter className="text-lg" />
-                  <span className="text-lg">{showFilters ? "Sembunyikan Filter" : "Tampilkan Filter"}</span>
+                  <FaEdit />
+                  <span>Edit</span>
+                </motion.button>
+                <motion.button 
+                  whileHover={{ scale: 1.05, y: -2 }}
+                  whileTap={{ scale: 0.95 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  className="px-6 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium flex items-center space-x-3 text-lg"
+                  onClick={handleDelete}
+                >
+                  <FaTrash />
+                  <span>Hapus</span>
                 </motion.button>
               </div>
-
-              {/* Active Filters */}
-              {(filterSP.Divisi || filterSP.Priority || filterSP.Status) && (
-                <motion.div 
-                  initial={{ opacity: 0, y: -10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, ease: "easeOut" }}
-                  className="flex flex-wrap gap-3 mb-4 p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-700 dark:to-gray-600 rounded-2xl"
-                >
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-300">Filter Aktif:</span>
-                  {filterSP.Divisi && (
-                    <motion.span 
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ duration: 0.3, type: "spring" }}
-                      className={`px-3 py-1 rounded-full text-sm font-medium ${DIVISI_COLORS[filterSP.Divisi]?.bg || 'bg-gray-500'} text-white flex items-center space-x-2`}
-                    >
-                      <span>{filterSP.Divisi}</span>
-                      <button onClick={() => setFilterSP(f => ({ ...f, Divisi: "" }))} className="hover:bg-white/20 rounded-full w-5 h-5 flex items-center justify-center">
-                        <FaTimes className="text-xs" />
-                      </button>
-                    </motion.span>
-                  )}
-                  {filterSP.Priority && (
-                    <motion.span 
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ duration: 0.3, type: "spring" }}
-                      className={`px-3 py-1 rounded-full text-sm font-medium ${PRIORITY_COLORS[filterSP.Priority]?.bg || 'bg-gray-500'} text-white flex items-center space-x-2`}
-                    >
-                      <span>{filterSP.Priority}</span>
-                      <button onClick={() => setFilterSP(f => ({ ...f, Priority: "" }))} className="hover:bg-white/20 rounded-full w-5 h-5 flex items-center justify-center">
-                        <FaTimes className="text-xs" />
-                      </button>
-                    </motion.span>
-                  )}
-                  {filterSP.Status && (
-                    <motion.span 
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ duration: 0.3, type: "spring" }}
-                      className={`px-3 py-1 rounded-full text-sm font-medium ${STATUS_COLORS[filterSP.Status]?.bg || 'bg-gray-500'} text-white flex items-center space-x-2`}
-                    >
-                      <span>{filterSP.Status}</span>
-                      <button onClick={() => setFilterSP(f => ({ ...f, Status: "" }))} className="hover:bg-white/20 rounded-full w-5 h-5 flex items-center justify-center">
-                        <FaTimes className="text-xs" />
-                      </button>
-                    </motion.span>
-                  )}
-                  <motion.button 
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={resetAllFilters}
-                    className="px-3 py-1 rounded-full bg-red-500 hover:bg-red-600 text-white text-sm font-medium flex items-center space-x-2"
-                  >
-                    <FaTimes />
-                    <span>Reset Semua</span>
-                  </motion.button>
-                </motion.div>
-              )}
-
-              {/* Filter Grid dengan Enhanced Collapsible */}
-              <AnimatePresence mode="wait">
-                {showFilters && (
-                  <motion.div 
-                    key="filter-section"
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ 
-                      opacity: 1, 
-                      height: "auto",
-                      transition: { 
-                        opacity: { duration: 0.4, ease: "easeOut" },
-                        height: { duration: 0.5, ease: "easeInOut" }
-                      }
-                    }}
-                    exit={{ 
-                      opacity: 0, 
-                      height: 0,
-                      transition: { 
-                        opacity: { duration: 0.3, ease: "easeIn" },
-                        height: { duration: 0.4, ease: "easeInOut" }
-                      }
-                    }}
-                    className="space-y-4 overflow-hidden"
-                  >
-                    {/* Divisi Filter */}
-                    <EnhancedFilterSection
-                      title="Filter Divisi"
-                      icon={FaBuilding}
-                      isOpen={openSections.divisi}
-                      onToggle={() => toggleSection('divisi')}
-                    >
-                      <motion.div 
-                        layout
-                        className="flex flex-wrap gap-3"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ duration: 0.4, delay: 0.1, staggerChildren: 0.05 }}
-                      >
-                        {DIVISI_OPTIONS.map((divisi, index) => (
-                          <motion.div
-                            key={divisi}
-                            initial={{ opacity: 0, scale: 0.8, y: 10 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            transition={{ 
-                              duration: 0.3, 
-                              delay: index * 0.03,
-                              type: "spring",
-                              stiffness: 100
-                            }}
-                            whileHover={{ 
-                              scale: 1.05,
-                              transition: { duration: 0.2 }
-                            }}
-                          >
-                            <AnimatedFilterButton
-                              value={divisi}
-                              onClick={() => handleDivisiFilter(divisi)}
-                              isActive={filterSP.Divisi === divisi}
-                              colorConfig={DIVISI_COLORS[divisi]}
-                            >
-                              {divisi}
-                            </AnimatedFilterButton>
-                          </motion.div>
-                        ))}
-                      </motion.div>
-                    </EnhancedFilterSection>
-
-                    {/* Priority Filter */}
-                    <EnhancedFilterSection
-                      title="Filter Prioritas"
-                      icon={FaExclamationTriangle}
-                      isOpen={openSections.priority}
-                      onToggle={() => toggleSection('priority')}
-                    >
-                      <motion.div 
-                        layout
-                        className="flex flex-wrap gap-3"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ duration: 0.4, delay: 0.2, staggerChildren: 0.1 }}
-                      >
-                        {Object.keys(PRIORITY_COLORS).map((priority, index) => (
-                          <motion.div
-                            key={priority}
-                            initial={{ opacity: 0, scale: 0.8, y: 10 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            transition={{ 
-                              duration: 0.3, 
-                              delay: index * 0.1,
-                              type: "spring",
-                              stiffness: 100
-                            }}
-                            whileHover={{ 
-                              scale: 1.05,
-                              transition: { duration: 0.2 }
-                            }}
-                          >
-                            <AnimatedFilterButton
-                              value={priority}
-                              onClick={() => handlePriorityFilter(priority)}
-                              isActive={filterSP.Priority === priority}
-                              colorConfig={PRIORITY_COLORS[priority]}
-                            >
-                              {priority}
-                            </AnimatedFilterButton>
-                          </motion.div>
-                        ))}
-                      </motion.div>
-                    </EnhancedFilterSection>
-
-                    {/* Status Filter */}
-                    <EnhancedFilterSection
-                      title="Filter Status"
-                      icon={FaCheck}
-                      isOpen={openSections.status}
-                      onToggle={() => toggleSection('status')}
-                    >
-                      <motion.div 
-                        layout
-                        className="flex flex-wrap gap-3"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ duration: 0.4, delay: 0.3, staggerChildren: 0.1 }}
-                      >
-                        {Object.keys(STATUS_COLORS).map((status, index) => (
-                          <motion.div
-                            key={status}
-                            initial={{ opacity: 0, scale: 0.8, y: 10 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            transition={{ 
-                              duration: 0.3, 
-                              delay: index * 0.1,
-                              type: "spring",
-                              stiffness: 100
-                            }}
-                            whileHover={{ 
-                              scale: 1.05,
-                              transition: { duration: 0.2 }
-                            }}
-                          >
-                            <AnimatedFilterButton
-                              value={status}
-                              onClick={() => handleStatusFilter(status)}
-                              isActive={filterSP.Status === status}
-                              colorConfig={STATUS_COLORS[status]}
-                            >
-                              {status}
-                            </AnimatedFilterButton>
-                          </motion.div>
-                        ))}
-                      </motion.div>
-                    </EnhancedFilterSection>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
-            {/* Action Buttons untuk selected item */}
-            {sel && (
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, ease: "easeOut" }}
-                className="flex gap-4 mb-6 p-6 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-700 dark:to-gray-600 rounded-2xl shadow-lg"
-              >
-                <div className="flex items-center space-x-3">
-                  <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                  <span className="font-semibold text-lg">Ticket Terpilih: <span className="text-blue-600 dark:text-blue-400">{sel.fields.TicketNumber || sel.id}</span></span>
-                </div>
-                <div className="flex gap-3 ml-auto">
-                  <motion.button 
-                    whileHover={{ scale: 1.05, y: -2 }}
-                    whileTap={{ scale: 0.95 }}
-                    transition={{ duration: 0.2, ease: "easeOut" }}
-                    className="px-6 py-3 rounded-xl bg-yellow-500 hover:bg-yellow-600 text-white font-medium flex items-center space-x-3 text-lg"
-                    onClick={openEdit}
-                  >
-                    <FaEdit />
-                    <span>Edit</span>
-                  </motion.button>
-                  <motion.button 
-                    whileHover={{ scale: 1.05, y: -2 }}
-                    whileTap={{ scale: 0.95 }}
-                    transition={{ duration: 0.2, ease: "easeOut" }}
-                    className="px-6 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-medium flex items-center space-x-3 text-lg"
-                    onClick={handleDelete}
-                  >
-                    <FaTrash />
-                    <span>Hapus</span>
-                  </motion.button>
-                </div>
-              </motion.div>
-            )}
-
-            {/* Data Display */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.4, delay: 0.6, ease: "easeOut" }}
-            >
-              <div className="rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-lg">
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                    <thead className="bg-gray-50 dark:bg-gray-700">
-                      <tr>
-                        <Th className="w-32">No. Ticket</Th>
-                        <Th className="w-48">Waktu Lapor</Th>
-                        <Th className="w-48">Waktu Selesai</Th>
-                        <Th className="w-64">User Requestor</Th>
-                        <Th className="w-64">Pelaksana (Tim IT)</Th>
-                        <Th className="w-44">Divisi</Th>
-                        <Th className="w-36">Prioritas</Th>
-                        <Th className="w-32">Status</Th>
-                        <Th className="min-w-[500px]">Deskripsi</Th>
-                        <Th className="w-32">Lampiran</Th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
-                      {loadingSP ? (
-                        <TableLoadingState colSpan={10} />
-                      ) : filteredSP.length === 0 ? (
-                        <TableEmptyState colSpan={10} />
-                      ) : (
-                        filteredSP.map((it, i) => (
-                          <RowSP 
-                            key={it.id} 
-                            r={it} 
-                            zebra={i % 2 === 1} 
-                            onSelect={() => setSel(it)}
-                            selected={sel?.id === it.id} 
-                            msal={{ instance, accounts }} 
-                          />
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-
-                {filteredSP.length > 0 && !loadingSP && (
-                  <div className="px-6 py-4 text-lg border-t border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400">
-                    Menampilkan {filteredSP.length} dari {rowsSP.length} tiket
-                  </div>
-                )}
-              </div>
             </motion.div>
+          )}
+
+          {/* Data Display */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.4, delay: 0.6, ease: "easeOut" }}
+          >
+            <div className="rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-lg">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <thead className="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                      <Th className="w-32">No. Ticket</Th>
+                      <Th className="w-48">Waktu Lapor</Th>
+                      <Th className="w-48">Waktu Selesai</Th>
+                      <Th className="w-64">User Requestor</Th>
+                      <Th className="w-64">Pelaksana (Tim IT)</Th>
+                      <Th className="w-44">Divisi</Th>
+                      <Th className="w-36">Prioritas</Th>
+                      <Th className="w-32">Status</Th>
+                      <Th className="min-w-[500px]">Deskripsi</Th>
+                      <Th className="w-32">Lampiran</Th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
+                    {loadingSP ? (
+                      <TableLoadingState colSpan={10} />
+                    ) : filteredSP.length === 0 ? (
+                      <TableEmptyState colSpan={10} />
+                    ) : (
+                      filteredSP.map((it, i) => (
+                        <RowSP 
+                          key={it.id} 
+                          r={it} 
+                          zebra={i % 2 === 1} 
+                          onSelect={() => setSel(it)}
+                          selected={sel?.id === it.id} 
+                          msal={{ instance, accounts }} 
+                        />
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {filteredSP.length > 0 && !loadingSP && (
+                <div className="px-6 py-4 text-lg border-t border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400">
+                  Menampilkan {filteredSP.length} dari {rowsSP.length} tiket
+                </div>
+              )}
+            </div>
           </motion.div>
         </GlassCard>
       </div>
@@ -993,23 +1071,7 @@ export default function TicketSolved() {
   );
 }
 
-/* ===================== SUB KOMPONEN ===================== */
-function Th({ children, className = "" }) {
-  return (
-    <th className={`px-6 py-4 text-left text-sm font-semibold text-gray-900 dark:text-white ${className}`}>
-      {children}
-    </th>
-  );
-}
-
-function Td({ children, className = "" }) {
-  return (
-    <td className={`px-6 py-4 text-sm text-gray-900 dark:text-white ${className}`}>
-      {children}
-    </td>
-  );
-}
-
+/* ===================== LOADING & EMPTY STATES ===================== */
 function TableLoadingState({ colSpan }) {
   return (
     <tr>
@@ -1050,16 +1112,32 @@ function TableEmptyState({ colSpan }) {
   );
 }
 
-// Komponen Avatar
-const Avatar = ({ name = "" }) => {
-  const init = useMemo(() => {
-    const parts = String(name || "").trim().split(/\s+/);
-    return (parts[0]?.[0] || "?") + (parts[1]?.[0] || "");
-  }, [name]);
+// Komponen Th
+const Th = ({ children, className = "" }) => (
+  <th className={`px-6 py-4 text-left text-sm font-semibold text-gray-900 dark:text-white ${className}`}>
+    {children}
+  </th>
+);
 
+// Komponen Td
+const Td = ({ children, className = "" }) => (
+  <td className={`px-6 py-4 text-sm text-gray-900 dark:text-white ${className}`}>
+    {children}
+  </td>
+);
+
+// Komponen Avatar
+const Avatar = ({ name, email, size = 8 }) => {
+  const initial = name ? name.charAt(0).toUpperCase() : email ? email.charAt(0).toUpperCase() : "?";
   return (
-    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 text-white flex items-center justify-center text-sm font-semibold shadow">
-      {String(init).toUpperCase()}
+    <div className="flex items-center space-x-3">
+      <div className={`w-${size} h-${size} rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold`}>
+        {initial}
+      </div>
+      <div className="flex flex-col">
+        <span className="font-medium text-sm">{name || "-"}</span>
+        {email && <span className="text-xs text-gray-500 dark:text-gray-400">{email}</span>}
+      </div>
     </div>
   );
 };
@@ -1068,103 +1146,193 @@ const Avatar = ({ name = "" }) => {
 const Chip = ({ children, colorConfig, className = "" }) => {
   const IconComponent = colorConfig?.icon;
   return (
-    <span className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-medium ${colorConfig?.bg || 'bg-gray-100 dark:bg-gray-700'} ${colorConfig?.text || 'text-gray-700 dark:text-gray-300'} ${className}`}>
+    <span className={`inline-flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-medium ${colorConfig.bg} ${colorConfig.text} ${className}`}>
       {IconComponent && <IconComponent />}
       <span>{children}</span>
     </span>
   );
 };
 
-/* ===== Row SP ===== */
-function RowSP({ r, zebra, onSelect, selected, msal }) {
+// Komponen RowSP
+const RowSP = ({ r, zebra, onSelect, selected, msal }) => {
   const f = r.fields;
-  const reqName = f.UserRequestor?.displayName || "-";
-  const reqEmail = f.UserRequestor?.email || "";
-  const exeName = f.Assignedto0?.displayName || f.Issueloggedby || "-";
-  const exeEmail = f.Assignedto0?.email || "";
-
+  
   return (
     <motion.tr 
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
       className={`cursor-pointer transition-all duration-300 ${
-        selected
-          ? "bg-purple-200 dark:bg-purple-800 font-bold"
-          : zebra
-            ? "bg-blue-50/60 dark:bg-blue-900/60"
-            : ""
-      } hover:bg-gray-50 dark:hover:bg-gray-700`}
+        selected 
+          ? 'bg-blue-100 dark:bg-blue-900/30 ring-2 ring-blue-500' 
+          : zebra 
+            ? 'bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-600/50'
+            : 'bg-white dark:bg-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+      }`}
       onClick={onSelect}
     >
       <Td className="font-mono font-semibold">{f.TicketNumber || r.id}</Td>
       <Td>{fmtWaktu(f.DateReported)}</Td>
       <Td>{fmtWaktu(f.DateFinished)}</Td>
-
       <Td>
-        <div className="flex items-center gap-3">
-          <Avatar name={reqName} />
-          <div className="leading-tight">
-            <div className="font-medium">{reqName}</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">{reqEmail}</div>
-          </div>
-        </div>
+        <Avatar 
+          name={f.UserRequestor?.displayName} 
+          email={f.UserRequestor?.email} 
+        />
       </Td>
-
       <Td>
-        <div className="flex items-center gap-3">
-          <Avatar name={exeName} />
-          <div className="leading-tight">
-            <div className="font-medium">{exeName}</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">{exeEmail}</div>
-          </div>
-        </div>
+        <Avatar 
+          name={f.Assignedto0?.displayName || f.Issueloggedby} 
+          email={f.Assignedto0?.email} 
+        />
       </Td>
-
       <Td>
         <Chip colorConfig={DIVISI_COLORS[f.Divisi] || DIVISI_COLORS["Umum"]}>
-          {f.Divisi || "-"}
+          {f.Divisi}
         </Chip>
       </Td>
       <Td>
         <Chip colorConfig={PRIORITY_COLORS[f.Priority] || PRIORITY_COLORS["Normal"]}>
-          {f.Priority || "-"}
+          {f.Priority}
         </Chip>
       </Td>
       <Td>
-        <Chip colorConfig={STATUS_COLORS[f.Status] || STATUS_COLORS["Selesai"]}>
-          {f.Status || "-"}
+        <Chip colorConfig={STATUS_COLORS[f.Status] || STATUS_COLORS["Completed"]}>
+          {f.Status}
         </Chip>
       </Td>
-      <Td><div className="max-w-[560px] whitespace-pre-wrap">{f.Description || "-"}</div></Td>
-      <Td>
+      <Td className="max-w-[500px] text-gray-700 dark:text-gray-200">
+        <div className="line-clamp-3">{f.Description}</div>
+      </Td>
+      <Td className="text-center">
         {f.HasAttachments && (
           <FaPaperclip className="mx-auto text-gray-500 dark:text-gray-400" />
         )}
       </Td>
     </motion.tr>
   );
-}
+};
 
-// Komponen FormModal (sama seperti di kode Anda)
-const FormModal = ({ mode, data, onClose, onSubmit, onPickPhoto, onRemovePhoto, photoPreview, fileInputRef }) => {
+// Komponen FormModal
+const FormModal = ({ mode, data, onClose, onSubmit, onPickPhoto, onRemovePhoto, fileInputRef, photoPreview }) => {
   return (
-    <div className="fixed inset-0 z-50">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-gray-800 text-gray-900 dark:text-white w-[720px] max-w-[92vw] rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700">
-        <div className="px-5 py-4 border-b border-gray-100 dark:border-gray-700 flex items-center justify-between">
-          <div className="font-semibold">{mode === "edit" ? "Edit" : "Tambah"} Ticket</div>
-          <button onClick={onClose} className="text-sm text-gray-500 hover:underline">tutup</button>
-        </div>
-
-        <form onSubmit={onSubmit} className="px-5 py-4 space-y-4">
-          {/* ... form fields sama seperti di kode Anda ... */}
-          <div className="flex justify-end gap-2 pt-2">
-            <button type="button" className="px-4 py-2 rounded bg-gray-200 dark:bg-gray-700 dark:text-white" onClick={onClose}>Batal</button>
-            <button type="submit" className="px-5 py-2 rounded bg-blue-600 text-white font-bold">Simpan</button>
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.9, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.9, opacity: 0 }}
+        transition={{ type: "spring", damping: 25 }}
+        className="rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-800 text-gray-800 dark:text-white"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <form onSubmit={onSubmit}>
+          <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+            <h2 className="text-2xl font-bold">
+              {mode === "create" ? "Tambah Ticket Baru" : "Edit Ticket"}
+            </h2>
+          </div>
+          
+          <div className="p-6 space-y-4">
+            {/* Form fields di sini */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Judul</label>
+                <input
+                  type="text"
+                  name="Title"
+                  defaultValue={data.Title}
+                  className="w-full px-4 py-3 rounded-xl border bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2">Nomor Ticket</label>
+                <input
+                  type="text"
+                  name="TicketNumber"
+                  defaultValue={data.TicketNumber}
+                  className="w-full px-4 py-3 rounded-xl border bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-800 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+            
+            {/* Tambahkan field lainnya sesuai kebutuhan */}
+            
+            {/* Photo Upload Section */}
+            <div>
+              <label className="block text-sm font-medium mb-2">Foto Bukti</label>
+              <div className="flex items-center space-x-4">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={onPickPhoto}
+                  accept="image/*"
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-4 py-2 rounded-xl bg-blue-500 dark:bg-blue-600 hover:bg-blue-600 dark:hover:bg-blue-700 text-white transition"
+                >
+                  <FaCamera className="inline mr-2" />
+                  Pilih Foto
+                </button>
+                {photoPreview && (
+                  <button
+                    type="button"
+                    onClick={onRemovePhoto}
+                    className="px-4 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white transition"
+                  >
+                    <FaTimes className="inline mr-2" />
+                    Hapus
+                  </button>
+                )}
+              </div>
+              {photoPreview && (
+                <div className="mt-4">
+                  <img 
+                    src={photoPreview} 
+                    alt="Preview" 
+                    className="max-w-xs rounded-xl shadow-lg"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+          
+          <div className="p-6 border-t border-gray-200 dark:border-gray-700 flex justify-end space-x-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-6 py-3 rounded-xl font-medium bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-800 dark:text-white transition"
+            >
+              Batal
+            </button>
+            <button
+              type="submit"
+              className="px-6 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white font-medium transition"
+            >
+              {mode === "create" ? "Simpan" : "Update"}
+            </button>
           </div>
         </form>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 };
+
+// Helper functions untuk upload attachment (jika diperlukan)
+async function uploadAttachmentToSP(instance, accounts, itemId, file) {
+  // Implementasi upload attachment
+}
+
+async function setDonePhotoMetaOnSP(instance, accounts, itemId, fileName) {
+  // Implementasi set metadata photo
+}
