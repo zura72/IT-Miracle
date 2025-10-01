@@ -3,6 +3,40 @@ import { useMsal } from "@azure/msal-react";
 import { useTheme } from "../../context/ThemeContext";
 import { motion, AnimatePresence } from "framer-motion";
 
+// API Functions - menggunakan fetch untuk berkomunikasi dengan server Railway
+const apiRequest = async (endpoint, options = {}) => {
+  const baseUrl = process.env.REACT_APP_API_URL || "https://it-backend-production.up.railway.app";
+  const url = `${baseUrl}${endpoint}`;
+  
+  try {
+    const config = {
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+      ...options,
+    };
+
+    if (config.body && typeof config.body !== 'string') {
+      config.body = JSON.stringify(config.body);
+    }
+
+    console.log(`API Request: ${url}`, config);
+
+    const response = await fetch(url, config);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('API request failed:', error);
+    throw error;
+  }
+};
+
 // Konfigurasi SharePoint
 const SHAREPOINT_CONFIG = {
   siteId: "waskitainfra.sharepoint.com,32252c41-8aed-4ed2-ba35-b6e2731b0d4a,fb2ae80c-1283-4942-a3e8-0d47e8d004fb",
@@ -12,10 +46,45 @@ const SHAREPOINT_CONFIG = {
   sharepointScopes: ["https://waskitainfra.sharepoint.com/.default"]
 };
 
-// Fungsi helper untuk SharePoint menggunakan Graph API
+// Fungsi helper untuk SharePoint menggunakan REST API langsung
 const sharePointAPI = {
-  // Create item di SharePoint menggunakan Graph API
-  createItem: async (instance, accounts, fields) => {
+  // Create item di SharePoint menggunakan REST API
+  createItem: async (instance, accounts, itemData) => {
+    const account = accounts?.[0];
+    const token = await instance.acquireTokenSilent({ 
+      scopes: SHAREPOINT_CONFIG.sharepointScopes, 
+      account 
+    });
+
+    // Gunakan REST API langsung ke SharePoint
+    const url = `${SHAREPOINT_CONFIG.restUrl}/_api/web/lists(guid'${SHAREPOINT_CONFIG.listId}')/items`;
+    
+    console.log('Creating SharePoint item with REST API:', itemData);
+    
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token.accessToken}`,
+        Accept: "application/json;odata=verbose",
+        "Content-Type": "application/json;odata=verbose",
+        "X-RequestDigest": "form digest value here" // SharePoint biasanya butuh ini, tapi untuk Graph API tidak
+      },
+      body: JSON.stringify(itemData),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('SharePoint REST API error details:', errorText);
+      throw new Error(`SharePoint API error: ${errorText}`);
+    }
+
+    const result = await response.json();
+    console.log('SharePoint item created successfully:', result);
+    return result;
+  },
+
+  // Create item menggunakan Graph API dengan format yang benar
+  createItemWithGraph: async (instance, accounts, fields) => {
     const account = accounts?.[0];
     const token = await instance.acquireTokenSilent({ 
       scopes: SHAREPOINT_CONFIG.graphScopes, 
@@ -24,7 +93,7 @@ const sharePointAPI = {
 
     const url = `https://graph.microsoft.com/v1.0/sites/${SHAREPOINT_CONFIG.siteId}/lists/${SHAREPOINT_CONFIG.listId}/items`;
     
-    console.log('Creating SharePoint item:', fields);
+    console.log('Creating SharePoint item with Graph API:', JSON.stringify({ fields }, null, 2));
     
     const response = await fetch(url, {
       method: "POST",
@@ -32,17 +101,77 @@ const sharePointAPI = {
         Authorization: `Bearer ${token.accessToken}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ fields }),
+      body: JSON.stringify({
+        fields: {
+          // Gunakan internal field names yang umum
+          "Title": fields.Title,
+          // Coba field description dengan berbagai kemungkinan internal names
+          "Description": fields.Description,
+          "Body": fields.Description, // Alternatif lain
+          // Status field
+          "Status": fields.Status,
+          // Priority field
+          "Priority": fields.Priority,
+          // Division field
+          "Division": fields.Division,
+          "Department": fields.Division, // Alternatif
+          // Ticket number
+          "TicketNumber": fields.TicketNumber,
+          // User information
+          "Requestor": fields.Requestor,
+          "Assignee": fields.Assignee
+        }
+      }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('SharePoint API error:', errorText);
-      throw new Error(`Gagal menyimpan ke SharePoint: ${errorText}`);
+      console.error('Graph API error details:', errorText);
+      
+      // Coba approach yang lebih sederhana
+      return await sharePointAPI.createItemSimple(instance, accounts, fields);
+    }
+
+    return await response.json();
+  },
+
+  // Approach yang lebih sederhana - hanya field yang paling dasar
+  createItemSimple: async (instance, accounts, fields) => {
+    const account = accounts?.[0];
+    const token = await instance.acquireTokenSilent({ 
+      scopes: SHAREPOINT_CONFIG.graphScopes, 
+      account 
+    });
+
+    const url = `https://graph.microsoft.com/v1.0/sites/${SHAREPOINT_CONFIG.siteId}/lists/${SHAREPOINT_CONFIG.listId}/items`;
+    
+    // Hanya gunakan Title dan Description saja dulu
+    const simpleFields = {
+      "Title": fields.Title,
+      "Description": fields.Description
+    };
+    
+    console.log('Creating SharePoint item with SIMPLE fields:', simpleFields);
+    
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token.accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        fields: simpleFields
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Simple approach also failed:', errorText);
+      throw new Error(`All SharePoint approaches failed: ${errorText}`);
     }
 
     const result = await response.json();
-    console.log('✅ SharePoint item created:', result);
+    console.log('SharePoint item created with simple approach:', result);
     return result;
   },
 
@@ -69,16 +198,16 @@ const sharePointAPI = {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Gagal upload lampiran: ${errorText}`);
+      throw new Error(`Attachment upload failed: ${errorText}`);
     }
 
     return { fileName: file.name };
   }
 };
 
-// Fungsi untuk memformat data ticket ke SharePoint
+// Fungsi untuk memformat data ticket
 const formatTicketForSharePoint = (ticket, notes, userName) => {
-  // Map priority
+  // Map priority dari format aplikasi ke format SharePoint
   const priorityMap = {
     'urgent': 'High',
     'high': 'High', 
@@ -86,7 +215,7 @@ const formatTicketForSharePoint = (ticket, notes, userName) => {
     'low': 'Low'
   };
 
-  // Map department
+  // Map department/divisi
   const departmentMap = {
     'IT': 'IT & System',
     'HR': 'Human Capital',
@@ -101,33 +230,35 @@ const formatTicketForSharePoint = (ticket, notes, userName) => {
     'Umum': 'Umum'
   };
 
-  const fields = {
-    // Basic fields yang umum ada di SharePoint
-    "Title": `Ticket ${ticket.ticketNo} - ${ticket.user}`,
-    "Description": `
-Data Ticket:
-- No. Ticket: ${ticket.ticketNo}
-- User: ${ticket.user}
-- Divisi: ${ticket.department}
-- Prioritas: ${ticket.priority}
-- Deskripsi: ${ticket.description || "Tidak ada deskripsi"}
+  const description = `
+TICKET: ${ticket.ticketNo}
+USER: ${ticket.user}
+DIVISI: ${ticket.department}
+PRIORITAS: ${ticket.priority}
+DESKRIPSI: ${ticket.description || "Tidak ada deskripsi"}
 
-Penyelesaian:
-- Operator: ${userName}
-- Waktu: ${new Date().toLocaleString('id-ID')}
-- Catatan: ${notes || "Tidak ada catatan tambahan"}
-    `.trim(),
-    
+--- PENYELESAIAN ---
+OPERATOR: ${userName}
+TANGGAL: ${new Date().toLocaleString('id-ID')}
+CATATAN: ${notes || "Tidak ada catatan tambahan"}
+  `.trim();
+
+  const fields = {
+    "Title": `[SELESAI] Ticket ${ticket.ticketNo} - ${ticket.user}`,
+    "Description": description,
     "Status": "Closed",
     "Priority": priorityMap[ticket.priority?.toLowerCase()] || "Normal",
     "Division": departmentMap[ticket.department] || ticket.department || "Umum",
-    "TicketNumber": parseInt(ticket.ticketNo) || 0
+    "TicketNumber": parseInt(ticket.ticketNo) || 0,
+    "Requestor": ticket.user || "Unknown",
+    "Assignee": userName || "IT Team"
   };
 
+  console.log('Formatted SharePoint fields:', fields);
   return fields;
 };
 
-// Animation variants
+// Animation variants dan komponen lainnya tetap sama...
 const fadeIn = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.5 } }
@@ -227,7 +358,7 @@ const Modal = ({ title, children, onClose, darkMode }) => (
   </motion.div>
 );
 
-// Component untuk menampilkan lampiran foto
+// Komponen AttachmentViewer, ImageThumbnail, MobileTicketCard tetap sama...
 const AttachmentViewer = ({ attachment, ticketNo, darkMode }) => {
   const [showImageModal, setShowImageModal] = useState(false);
   
@@ -237,12 +368,23 @@ const AttachmentViewer = ({ attachment, ticketNo, darkMode }) => {
     if (typeof photoData === 'string') {
       if (photoData.startsWith('http')) {
         return photoData;
+      } else if (photoData.startsWith('/')) {
+        const baseUrl = process.env.REACT_APP_API_URL || "https://it-backend-production.up.railway.app";
+        return `${baseUrl}${photoData}`;
       }
     }
     
     if (typeof photoData === 'object' && photoData !== null) {
       if (photoData.data && photoData.contentType) {
         return `data:${photoData.contentType};base64,${photoData.data}`;
+      }
+      
+      const possibleBase64Fields = ['base64', 'buffer', 'file', 'image'];
+      for (const field of possibleBase64Fields) {
+        if (photoData[field] && typeof photoData[field] === 'string') {
+          const contentType = photoData.contentType || photoData.type || 'image/jpeg';
+          return `data:${contentType};base64,${photoData[field]}`;
+        }
       }
     }
     
@@ -303,7 +445,24 @@ const AttachmentViewer = ({ attachment, ticketNo, darkMode }) => {
                   src={imageUrl} 
                   alt={`Lampiran ticket ${ticketNo}`}
                   className="max-w-full max-h-[70vh] object-contain"
+                  onError={(e) => {
+                    console.error('Gagal memuat gambar:', imageUrl);
+                    e.target.onerror = null;
+                    e.target.src = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iIzMzMyIvPjx0ZXh0IHg9IjEwMCIgeT0iMTAwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiM2NjYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5HYWdhbCBtdW5jdWwgbWVtdWF0IGdhbWJhcjwvdGV4dD48L3N2Zz4=";
+                  }}
                 />
+              </div>
+              <div className="flex justify-center mt-2">
+                <a 
+                  href={imageUrl} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className={`px-4 py-2 rounded-lg ${
+                    darkMode ? "bg-blue-600 hover:bg-blue-700" : "bg-blue-500 hover:bg-blue-600"
+                  } text-white text-sm`}
+                >
+                  Buka di Tab Baru
+                </a>
               </div>
             </motion.div>
           </motion.div>
@@ -313,7 +472,6 @@ const AttachmentViewer = ({ attachment, ticketNo, darkMode }) => {
   );
 };
 
-// Thumbnail component
 const ImageThumbnail = ({ src, alt, className = "" }) => {
   const [imageError, setImageError] = useState(false);
 
@@ -335,14 +493,30 @@ const ImageThumbnail = ({ src, alt, className = "" }) => {
   );
 };
 
-// Mobile Ticket Card Component
 const MobileTicketCard = ({ ticket, index, darkMode, onAction }) => {
   const getImageUrl = (photoData) => {
     if (!photoData) return null;
     
+    if (typeof photoData === 'string') {
+      if (photoData.startsWith('http')) {
+        return photoData;
+      } else if (photoData.startsWith('/')) {
+        const baseUrl = process.env.REACT_APP_API_URL || "https://it-backend-production.up.railway.app";
+        return `${baseUrl}${photoData}`;
+      }
+    }
+    
     if (typeof photoData === 'object' && photoData !== null) {
       if (photoData.data && photoData.contentType) {
         return `data:${photoData.contentType};base64,${photoData.data}`;
+      }
+      
+      const possibleBase64Fields = ['base64', 'buffer', 'file', 'image'];
+      for (const field of possibleBase64Fields) {
+        if (photoData[field] && typeof photoData[field] === 'string') {
+          const contentType = photoData.contentType || photoData.type || 'image/jpeg';
+          return `data:${contentType};base64,${photoData[field]}`;
+        }
       }
     }
     
@@ -399,6 +573,10 @@ const MobileTicketCard = ({ ticket, index, darkMode, onAction }) => {
           <div className="text-sm line-clamp-2">{ticket.description}</div>
         </div>
         <div>
+          <div className="text-xs text-gray-500">Assignee</div>
+          <div className="text-sm">{ticket.assignee}</div>
+        </div>
+        <div>
           <div className="text-xs text-gray-500">Status</div>
           <span className={`px-2 py-1 rounded-full text-xs ${
             ticket.status === 'Belum' ? 'bg-yellow-100 text-yellow-800' :
@@ -424,6 +602,15 @@ const MobileTicketCard = ({ ticket, index, darkMode, onAction }) => {
           <span>Selesai</span>
         </motion.button>
         <motion.button
+          onClick={() => onAction("decline", ticket)}
+          className="flex-1 px-3 py-2 bg-yellow-500 text-white rounded-lg text-sm flex items-center justify-center gap-1"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <span>❌</span>
+          <span>Tolak</span>
+        </motion.button>
+        <motion.button
           onClick={() => onAction("delete", ticket)}
           className="flex-1 px-3 py-2 bg-red-500 text-white rounded-lg text-sm flex items-center justify-center gap-1"
           whileHover={{ scale: 1.05 }}
@@ -437,8 +624,8 @@ const MobileTicketCard = ({ ticket, index, darkMode, onAction }) => {
   );
 };
 
-// Modal Resolve - LANGSUNG KE SHAREPOINT
-const ResolveModal = ({ ticket, onClose, onSuccess, darkMode, userName }) => {
+// Modal Resolve dengan multiple approaches
+const ResolveModal = ({ ticket, onClose, onSubmit, darkMode, userName }) => {
   const [notes, setNotes] = useState("");
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -447,34 +634,51 @@ const ResolveModal = ({ ticket, onClose, onSuccess, darkMode, userName }) => {
   const handleSubmit = async () => {
     setUploading(true);
     try {
-      // 1. Format data untuk SharePoint
-      const sharePointFields = formatTicketForSharePoint(ticket, notes, userName);
-      
-      // 2. Create item di SharePoint
-      console.log('🔄 Menyimpan ke SharePoint...');
-      const sharePointResult = await sharePointAPI.createItem(instance, accounts, sharePointFields);
-      const sharePointItemId = sharePointResult.id;
-      
-      console.log('✅ Berhasil dibuat di SharePoint, ID:', sharePointItemId);
-
-      // 3. Jika ada file, upload attachment
+      let sharePointItemId = null;
       let uploadedFileName = null;
-      if (file && sharePointItemId) {
+
+      // Format data untuk SharePoint
+      const sharePointFields = formatTicketForSharePoint(ticket, notes, userName);
+
+      console.log('Attempting to create SharePoint item...');
+      
+      // Coba create item di SharePoint dengan multiple approaches
+      try {
+        // Approach 1: Graph API dengan field lengkap
+        const sharePointResult = await sharePointAPI.createItemWithGraph(instance, accounts, sharePointFields);
+        sharePointItemId = sharePointResult.id;
+        console.log('✅ SharePoint item created successfully with Graph API:', sharePointItemId);
+      } catch (graphError) {
+        console.log('Graph API failed, trying simple approach...');
+        
+        // Approach 2: Simple approach
         try {
-          console.log('📎 Uploading file...');
-          const uploadResult = await sharePointAPI.uploadAttachment(instance, accounts, sharePointItemId, file);
-          uploadedFileName = uploadResult.fileName;
-          console.log('✅ File berhasil diupload:', uploadedFileName);
-        } catch (uploadError) {
-          console.warn('⚠️ File upload gagal, tapi data tetap tersimpan:', uploadError);
+          const simpleResult = await sharePointAPI.createItemSimple(instance, accounts, sharePointFields);
+          sharePointItemId = simpleResult.id;
+          console.log('✅ SharePoint item created successfully with simple approach:', sharePointItemId);
+        } catch (simpleError) {
+          console.log('All SharePoint approaches failed, but continuing with Railway update...');
+          // Lanjutkan tanpa SharePoint, hanya update Railway
         }
       }
 
-      // 4. Beri feedback sukses
-      onSuccess(`✅ Ticket berhasil diselesaikan dan disimpan ke SharePoint!`);
-      
+      // Jika berhasil create item dan ada file, upload attachment
+      if (sharePointItemId && file) {
+        try {
+          console.log('Uploading file to SharePoint:', file.name);
+          const uploadResult = await sharePointAPI.uploadAttachment(instance, accounts, sharePointItemId, file);
+          uploadedFileName = uploadResult.fileName;
+          console.log('✅ File uploaded to SharePoint:', uploadedFileName);
+        } catch (uploadError) {
+          console.warn('File upload failed, but continuing:', uploadError);
+        }
+      }
+
+      // Update status di database lokal (Railway)
+      await onSubmit(ticket.id, notes, uploadedFileName, sharePointItemId);
+
     } catch (error) {
-      console.error('❌ Error:', error);
+      console.error('Error in handleSubmit:', error);
       throw error;
     } finally {
       setUploading(false);
@@ -534,15 +738,6 @@ const ResolveModal = ({ ticket, onClose, onSuccess, darkMode, userName }) => {
           />
         </div>
 
-        <div className={`p-3 rounded-lg ${darkMode ? "bg-yellow-900/20 border border-yellow-700" : "bg-yellow-50 border border-yellow-200"}`}>
-          <div className="flex items-start gap-2">
-            <span className="text-yellow-600 dark:text-yellow-400">📢</span>
-            <div className="text-sm">
-              <strong>Data akan langsung disimpan ke SharePoint List</strong>
-            </div>
-          </div>
-        </div>
-
         <div className="flex gap-2 justify-end pt-4">
           <motion.button
             onClick={onClose}
@@ -565,12 +760,12 @@ const ResolveModal = ({ ticket, onClose, onSuccess, darkMode, userName }) => {
             {uploading ? (
               <>
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Menyimpan ke SharePoint...
+                Menyimpan...
               </>
             ) : (
               <>
                 <span>✅</span>
-                Simpan ke SharePoint
+                Konfirmasi Selesai
               </>
             )}
           </motion.button>
@@ -580,7 +775,7 @@ const ResolveModal = ({ ticket, onClose, onSuccess, darkMode, userName }) => {
   );
 };
 
-// Main Component
+// Main Component (sama seperti sebelumnya)
 export default function TicketEntry() {
   const { dark: darkMode } = useTheme();
   const { instance, accounts } = useMsal();
@@ -605,7 +800,6 @@ export default function TicketEntry() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Stats calculation
   const stats = {
     total: tickets.length,
     urgent: tickets.filter(t => t.priority && t.priority.toLowerCase() === "urgent").length,
@@ -614,12 +808,10 @@ export default function TicketEntry() {
     belum: tickets.filter(t => t.status === "Belum").length,
   };
 
-  // Load tickets dari server (hanya untuk display, tidak untuk disimpan)
   useEffect(() => {
     loadTickets();
   }, []);
 
-  // Filter tickets
   useEffect(() => {
     const query = searchQuery.toLowerCase();
     const filtered = tickets.filter(ticket => 
@@ -636,38 +828,33 @@ export default function TicketEntry() {
       setLoading(true);
       setError("");
       
-      // Untuk demo, kita buat data dummy
-      const dummyTickets = [
-        {
-          id: 1,
-          ticketNo: "T001",
-          createdAt: new Date().toISOString(),
-          user: "John Doe",
-          department: "IT",
-          priority: "High",
-          description: "Komputer tidak bisa menyala",
-          assignee: userName,
-          attachment: null,
-          status: "Belum"
-        },
-        {
-          id: 2,
-          ticketNo: "T002", 
-          createdAt: new Date().toISOString(),
-          user: "Jane Smith",
-          department: "HR",
-          priority: "Normal",
-          description: "Printer bermasalah",
-          assignee: userName,
-          attachment: null,
-          status: "Belum"
-        }
-      ];
+      const data = await apiRequest("/api/tickets?status=Belum");
       
-      setTickets(dummyTickets);
+      console.log("Data received from server:", data);
+      
+      const formattedTickets = (data.rows || []).map(ticket => {
+        let attachment = ticket.photo || ticket.attachment || '';
+        
+        return {
+          id: ticket._id || ticket.id,
+          ticketNo: ticket.ticketNo,
+          createdAt: ticket.createdAt,
+          user: ticket.name,
+          department: ticket.division,
+          priority: ticket.priority || "Normal",
+          description: ticket.description,
+          assignee: ticket.assignee || userName,
+          attachment: attachment,
+          status: ticket.status,
+          notes: ticket.notes,
+          operator: ticket.operator
+        };
+      });
+      
+      setTickets(formattedTickets);
     } catch (err) {
       console.error("Error loading tickets:", err);
-      setError("Gagal memuat tiket");
+      setError("Gagal memuat tiket: " + (err.message || "Koneksi ke server gagal"));
       setTickets([]);
     } finally {
       setLoading(false);
@@ -694,7 +881,7 @@ export default function TicketEntry() {
               Ticket Management
             </h1>
             <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base">
-              Kelola tiket - Data langsung ke SharePoint
+              Kelola tiket yang belum diproses - Connected to Railway & SharePoint
             </p>
           </motion.div>
           
@@ -721,7 +908,7 @@ export default function TicketEntry() {
             >
               <input
                 type="text"
-                placeholder="Cari tiket..."
+                placeholder="Cari tiket berdasarkan nomor, nama, divisi, atau deskripsi..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className={`w-full px-4 py-3 rounded-xl border ${
@@ -751,7 +938,6 @@ export default function TicketEntry() {
         </motion.div>
       </motion.div>
 
-      {/* Notifications */}
       <AnimatePresence>
         {error && (
           <motion.div
@@ -803,11 +989,11 @@ export default function TicketEntry() {
                 transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                 className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto"
               />
-              <p className="mt-2 text-gray-500">Memuat tiket...</p>
+              <p className="mt-2 text-gray-500">Memuat tiket dari server...</p>
             </div>
           ) : filteredTickets.length === 0 ? (
             <div className="text-center p-8 text-gray-500">
-              {searchQuery ? "Tidak ada tiket yang cocok" : "Tidak ada tiket"}
+              {searchQuery ? "Tidak ada tiket yang cocok dengan pencarian" : "Tidak ada tiket yang belum diproses"}
             </div>
           ) : (
             <AnimatePresence>
@@ -843,6 +1029,7 @@ export default function TicketEntry() {
                   <th className="p-4 text-left">Priority</th>
                   <th className="p-4 text-left">Description</th>
                   <th className="p-4 text-left">Lampiran</th>
+                  <th className="p-4 text-left">Assignee</th>
                   <th className="p-4 text-left">Status</th>
                   <th className="p-4 text-center">Actions</th>
                 </tr>
@@ -850,19 +1037,19 @@ export default function TicketEntry() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={8} className="p-8 text-center">
+                    <td colSpan={9} className="p-8 text-center">
                       <motion.div 
                         animate={{ rotate: 360 }}
                         transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                         className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto"
                       />
-                      <p className="mt-2 text-gray-500">Memuat tiket...</p>
+                      <p className="mt-2 text-gray-500">Memuat tiket dari server...</p>
                     </td>
                   </tr>
                 ) : filteredTickets.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="p-8 text-center text-gray-500">
-                      {searchQuery ? "Tidak ada tiket yang cocok" : "Tidak ada tiket"}
+                    <td colSpan={9} className="p-8 text-center text-gray-500">
+                      {searchQuery ? "Tidak ada tiket yang cocok dengan pencarian" : "Tidak ada tiket yang belum diproses"}
                     </td>
                   </tr>
                 ) : (
@@ -886,6 +1073,7 @@ export default function TicketEntry() {
                         <td className="p-4">
                           <AttachmentViewer attachment={ticket.attachment} ticketNo={ticket.ticketNo} darkMode={darkMode} />
                         </td>
+                        <td className="p-4">{ticket.assignee}</td>
                         <td className="p-4">
                           <span className={`px-2 py-1 rounded-full text-xs ${
                             ticket.status === 'Belum' ? 'bg-yellow-100 text-yellow-800' :
@@ -907,6 +1095,18 @@ export default function TicketEntry() {
                               title="Selesaikan Ticket"
                             >
                               ✅
+                            </motion.button>
+                            <motion.button
+                              onClick={() => {
+                                setActiveModal("decline");
+                                setSelectedTicket(ticket);
+                              }}
+                              className="px-3 py-1 bg-yellow-500 text-white rounded-lg text-sm"
+                              whileHover={{ scale: 1.1 }}
+                              whileTap={{ scale: 0.9 }}
+                              title="Tolak Ticket"
+                            >
+                              ❌
                             </motion.button>
                             <motion.button
                               onClick={() => {
@@ -938,14 +1138,63 @@ export default function TicketEntry() {
           <ResolveModal
             ticket={selectedTicket}
             onClose={() => setActiveModal(null)}
-            onSuccess={(message) => {
-              setSuccess(message);
-              setActiveModal(null);
-              // Hapus ticket dari local state setelah berhasil disimpan ke SharePoint
-              setTickets(prev => prev.filter(t => t.id !== selectedTicket.id));
+            onSubmit={async (ticketId, notes, filePath, sharePointItemId) => {
+              try {
+                setError("");
+                
+                const resolveData = {
+                  notes: notes || "",
+                  operator: userName,
+                  resolvedPhoto: filePath,
+                  sharePointItemId: sharePointItemId,
+                  sharePointSync: !!sharePointItemId
+                };
+
+                await apiRequest(`/api/tickets/${ticketId}/resolve`, {
+                  method: "POST",
+                  body: resolveData
+                });
+                
+                if (sharePointItemId) {
+                  setSuccess(`✅ Ticket berhasil diselesaikan dan disimpan ke SharePoint! (ID: ${sharePointItemId})`);
+                } else {
+                  setSuccess(`✅ Ticket berhasil diselesaikan! (SharePoint: Gagal, tapi data tersimpan di Railway)`);
+                }
+                
+                setActiveModal(null);
+                await loadTickets();
+              } catch (err) {
+                console.error('Error in main resolve handler:', err);
+                setError("Gagal menyelesaikan tiket: " + err.message);
+              }
             }}
             darkMode={darkMode}
             userName={userName}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* DeclineModal dan DeleteModal tetap sama */}
+      <AnimatePresence>
+        {activeModal === "decline" && selectedTicket && (
+          <DeclineModal
+            ticket={selectedTicket}
+            onClose={() => setActiveModal(null)}
+            onSubmit={async (ticketId, reason) => {
+              try {
+                setError("");
+                await apiRequest(`/api/tickets/${ticketId}/decline`, {
+                  method: "POST",
+                  body: { notes: reason || "", operator: userName }
+                });
+                setSuccess("Ticket berhasil ditolak");
+                setActiveModal(null);
+                await loadTickets();
+              } catch (err) {
+                setError("Gagal menolak tiket: " + err.message);
+              }
+            }}
+            darkMode={darkMode}
           />
         )}
       </AnimatePresence>
@@ -955,10 +1204,16 @@ export default function TicketEntry() {
           <DeleteModal
             ticket={selectedTicket}
             onClose={() => setActiveModal(null)}
-            onSuccess={() => {
-              setSuccess("Ticket berhasil dihapus");
-              setActiveModal(null);
-              setTickets(prev => prev.filter(t => t.id !== selectedTicket.id));
+            onSubmit={async (ticketId) => {
+              try {
+                setError("");
+                await apiRequest(`/api/tickets/${ticketId}`, { method: "DELETE" });
+                setSuccess("Ticket berhasil dihapus");
+                setActiveModal(null);
+                await loadTickets();
+              } catch (err) {
+                setError("Gagal menghapus tiket: " + err.message);
+              }
             }}
             darkMode={darkMode}
           />
@@ -968,32 +1223,29 @@ export default function TicketEntry() {
   );
 }
 
-// Delete Modal
-const DeleteModal = ({ ticket, onClose, onSuccess, darkMode }) => {
-  const [deleting, setDeleting] = useState(false);
-
-  const handleDelete = async () => {
-    setDeleting(true);
-    try {
-      // Langsung hapus dari local state saja
-      // Karena data utama sudah di SharePoint
-      await new Promise(resolve => setTimeout(resolve, 500)); // Simulasi loading
-      onSuccess();
-    } catch (error) {
-      console.error('Delete error:', error);
-    } finally {
-      setDeleting(false);
-    }
-  };
+// Modal Components lainnya
+const DeclineModal = ({ ticket, onClose, onSubmit, darkMode }) => {
+  const [reason, setReason] = useState("");
 
   return (
-    <Modal title={`Hapus Ticket ${ticket.ticketNo}`} onClose={onClose} darkMode={darkMode}>
+    <Modal title={`Tolak Ticket ${ticket.ticketNo}`} onClose={onClose} darkMode={darkMode}>
       <div className="space-y-4">
-        <p>Apakah Anda yakin ingin menghapus ticket ini dari daftar?</p>
+        <div>
+          <label className="block mb-2 font-medium">Alasan Penolakan</label>
+          <textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={3}
+            className={`w-full p-2 border rounded ${
+              darkMode ? "bg-gray-700 border-gray-600" : "border-gray-300"
+            }`}
+            placeholder="Berikan alasan penolakan..."
+            required
+          />
+        </div>
         <div className="flex gap-2 justify-end">
           <motion.button
             onClick={onClose}
-            disabled={deleting}
             className={`px-4 py-2 border rounded-lg ${
               darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"
             }`}
@@ -1003,20 +1255,43 @@ const DeleteModal = ({ ticket, onClose, onSuccess, darkMode }) => {
             Batal
           </motion.button>
           <motion.button
-            onClick={handleDelete}
-            disabled={deleting}
-            className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 flex items-center gap-2"
+            onClick={() => onSubmit(ticket.id, reason)}
+            disabled={!reason.trim()}
+            className="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
-            {deleting ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Menghapus...
-              </>
-            ) : (
-              'Hapus'
-            )}
+            Tolak Ticket
+          </motion.button>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+const DeleteModal = ({ ticket, onClose, onSubmit, darkMode }) => {
+  return (
+    <Modal title={`Hapus Ticket ${ticket.ticketNo}`} onClose={onClose} darkMode={darkMode}>
+      <div className="space-y-4">
+        <p>Apakah Anda yakin ingin menghapus ticket ini? Tindakan ini tidak dapat dibatalkan.</p>
+        <div className="flex gap-2 justify-end">
+          <motion.button
+            onClick={onClose}
+            className={`px-4 py-2 border rounded-lg ${
+              darkMode ? "hover:bg-gray-700" : "hover:bg-gray-100"
+            }`}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            Batal
+          </motion.button>
+          <motion.button
+            onClick={() => onSubmit(ticket.id)}
+            className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            Hapus
           </motion.button>
         </div>
       </div>
