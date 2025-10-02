@@ -5,29 +5,23 @@ import "./ChatHost.css";
 
 /* ===================== API URL HELPER ===================== */
 export function apiUrl(path = "") {
-  // Gunakan URL Railway sebagai default
   const base = process.env.REACT_APP_API_BASE || "https://it-backend-production.up.railway.app/api";
   const normalizedBase = base.endsWith('/') ? base.slice(0, -1) : base;
   const normalizedPath = path.startsWith('/') ? path : `/${path}`;
   return `${normalizedBase}${normalizedPath}`;
 }
 
-// Helper untuk mendapatkan base URL tanpa /api
 export function getBaseUrl() {
   const base = process.env.REACT_APP_API_BASE || "https://it-backend-production.up.railway.app";
   return base.replace('/api', '');
 }
 
 /* ===================== API Connection Test ===================== */
-/**
- * Test koneksi ke server API dengan metode GET ke endpoint yang valid
- */
 async function testApiConnection() {
   try {
-    // Gunakan endpoint yang lebih umum untuk test koneksi
     const url = apiUrl("/tickets"); 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // Timeout lebih lama untuk production
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     const response = await fetch(url, {
       method: 'GET',
@@ -38,8 +32,6 @@ async function testApiConnection() {
     });
 
     clearTimeout(timeoutId);
-
-    // Anggap berhasil jika server merespon (bahkan 404 OK)
     return response.status !== 0 && response.status < 500;
   } catch (error) {
     console.warn('API connection test failed:', error);
@@ -47,9 +39,6 @@ async function testApiConnection() {
   }
 }
 
-/**
- * Test koneksi periodik dengan exponential backoff
- */
 function useApiConnectionTest() {
   const [isOnline, setIsOnline] = useState(true);
   const [lastChecked, setLastChecked] = useState(null);
@@ -61,7 +50,7 @@ function useApiConnectionTest() {
       setIsOnline(isConnected);
       setLastChecked(new Date());
       if (isConnected) {
-        setRetryCount(0); // Reset retry count jika berhasil
+        setRetryCount(0);
       } else {
         setRetryCount(prev => prev + 1);
       }
@@ -75,16 +64,12 @@ function useApiConnectionTest() {
     }
   };
 
-  // Test koneksi saat component mount
   useEffect(() => {
     console.log("API Base URL:", apiUrl());
     console.log("Base URL for images:", getBaseUrl());
-    console.log("Environment:", process.env.NODE_ENV);
-    console.log("REACT_APP_API_BASE:", process.env.REACT_APP_API_BASE);
     
     testConnection();
 
-    // Test koneksi dengan interval yang adaptif
     const intervalTime = isOnline ? 60000 : Math.min(30000 * Math.pow(1.5, retryCount), 120000);
     
     const interval = setInterval(() => {
@@ -100,53 +85,93 @@ function useApiConnectionTest() {
 /* ===================== helpers ===================== */
 const yesWords = new Set([
   "ya","iya","y","yaaa","ok","oke","baik","siap","betul","benar","yup",
-  "yaudah","silakan","lanjut"
+  "yaudah","silakan","lanjut","yes","yap","okey","sip","gas"
 ]);
+
+const noWords = new Set([
+  "tidak","nggak","gak","no","belum","jangan","jgn","tdk","ga"
+]);
+
 const nowStr = () => new Date().toLocaleString();
 
-const DIVISION_OPTIONS = [
-  "BOD (Urgent)",
-  "Sekretarian Perusahaan",
-  "Internal Audit",
-  "Keuangan",
-  "Akuntansi",
-  "HCM",
-  "Manajemen Risiko",
-  "Legal",
-  "Pemasaran",
-  "Produksi & Peralatan",
-  "Pengembangan Bisnis & Portofolio",
-  "TI & System",
-  "QHSE",
-  "Pengendalian Proyek & SCM",
-  "Produksi & Peralatan WS 1",
-  "Produksi & Peralatan WS 2",
-  "WS 1",
-  "WS 2",
-  "WWE",
-  "WSE",
-  "Project Coordinator",
-  "Proyek"
+// Data departemen berdasarkan struktur yang diminta
+const DEPARTMENT_STRUCTURE = [
+  {
+    title: "BOD, Departemen. Internal Audit, dan Sekper",
+    options: ["BOD", "Sekretariat Perusahaan", "Internal Audit"]
+  },
+  {
+    title: "Departemen. Keuangan, dan Akuntansi", 
+    options: ["Keuangan", "Akuntansi"]
+  },
+  {
+    title: "Departemen. HCM & GA",
+    options: ["HCM & GA"]
+  },
+  {
+    title: "Departemen. Manajemen Risiko",
+    options: ["Manajemen Risiko"]
+  },
+  {
+    title: "Departemen Legal, Pemasaran, dan Pengembangan Bisnis & Portofolio",
+    options: ["Legal", "Pemasaran", "Pengembangan Bisnis & Portofolio"]
+  },
+  {
+    title: "Departemen TI & Sistem", 
+    options: ["TI & Sistem"]
+  },
+  {
+    title: "Unit Bisnis",
+    options: ["Operasi"]
+  },
+  {
+    title: "Proyek",
+    options: ["Project Coordinator", "Proyek"]
+  },
+  {
+    title: "Departemen. Produksi",
+    options: ["Produksi & Peralatan", "Produksi & Peralatan WS 1", "Produksi & Peralatan WS 2"]
+  },
+  {
+    title: "Workshop", 
+    options: ["Workshop 1", "Workshop 2"]
+  },
+  {
+    title: "PT Waskita Sangir Energi",
+    options: ["WSE"]
+  },
+  {
+    title: "PT Waskita Wado Energi", 
+    options: ["WWE"]
+  },
+  {
+    title: "Departemen. Pengendalian & QHSE",
+    options: ["Pengendalian & QHSE"]
+  },
+  {
+    title: "Departemen SCM",
+    options: ["SCM"]
+  }
 ];
 
+const DEPARTMENT_OPTIONS = DEPARTMENT_STRUCTURE.flatMap(group => group.options);
+
 /** Kirim tiket ke server */
-async function createTicket({ name, division = "", description, photo }) {
-  // Pastikan semua field required ada
+async function createTicket({ name, department = "", description, photo }) {
   const ticketData = {
     name: String(name || "User").trim(),
-    division: String(division || "Umum").trim(),
+    department: String(department || "Umum").trim(),
     description: String(description || "").trim(),
-    priority: String(division).trim().toLowerCase().includes("bod (urgent)") ? "High" : "Normal"
+    priority: String(department).trim().toLowerCase().includes("bod") ? "High" : "Normal"
   };
 
-  // Validasi field required
-  if (!ticketData.name || !ticketData.division || !ticketData.description) {
-    throw new Error(`Field yang diperlukan tidak lengkap: name="${ticketData.name}", division="${ticketData.division}", description="${ticketData.description}"`);
+  if (!ticketData.name || !ticketData.department || !ticketData.description) {
+    throw new Error(`Field yang diperlukan tidak lengkap: name="${ticketData.name}", department="${ticketData.department}", description="${ticketData.description}"`);
   }
 
   const fd = new FormData();
   fd.append("name", ticketData.name);
-  fd.append("division", ticketData.division);
+  fd.append("department", ticketData.department);
   fd.append("priority", ticketData.priority);
   fd.append("description", ticketData.description);
   
@@ -154,9 +179,7 @@ async function createTicket({ name, division = "", description, photo }) {
     fd.append("photo", photo);
   }
 
-  // Debug: log data yang akan dikirim
   console.log("Mengirim tiket dengan data:", ticketData);
-  console.log("Photo file:", photo);
   console.log("API URL:", apiUrl("/tickets"));
 
   const url = apiUrl("/tickets");
@@ -168,17 +191,14 @@ async function createTicket({ name, division = "", description, photo }) {
     });
 
     console.log("Response status:", response.status);
-    console.log("Response headers:", Object.fromEntries(response.headers.entries()));
     
     if (!response.ok) {
       let errorText = "Unknown error";
       try {
         errorText = await response.text();
-        // Coba parse sebagai JSON jika mungkin
         const errorJson = JSON.parse(errorText);
         errorText = errorJson.message || errorJson.error || errorText;
       } catch (e) {
-        // Jika bukan JSON, gunakan text biasa
         errorText = `HTTP ${response.status} - ${response.statusText}`;
       }
       throw new Error(`Gagal membuat tiket (HTTP ${response.status}): ${errorText}`);
@@ -200,7 +220,6 @@ async function createTicket({ name, division = "", description, photo }) {
   } catch (error) {
     console.error("Error creating ticket:", error);
     
-    // Handle CORS errors specifically
     if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
       throw new Error(`Gagal terhubung ke server. Pastikan backend di ${url} dapat diakses dan mengizinkan CORS.`);
     }
@@ -209,33 +228,77 @@ async function createTicket({ name, division = "", description, photo }) {
   }
 }
 
-/** Ambil nama & divisi dari MSAL claims (sinkron). */
+/** Ambil nama & departemen dari MSAL claims */
 function readProfileFromMsal(accounts) {
   const a = accounts?.[0];
   const c = a?.idTokenClaims || {};
   const name = a?.name || c.name || c.given_name || a?.username || c.preferred_username || "User";
-  const division = c.department || c.division || c.jobTitle || "Umum";
+  const department = c.department || c.department || c.jobTitle || "Umum";
   return { 
     name: String(name || "User").trim(), 
-    division: String(division || "Umum").trim() 
+    department: String(department || "Umum").trim() 
   };
 }
 
 /* ===================== sub-komponen UI ===================== */
-function HelpCTA({ onClick, disabled = false }) {
+
+// Server Time di Header
+function ServerTimeHeader() {
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="server-time-header">
+      <div className="server-time-icon">⏰</div>
+      <div className="server-time-content">
+        <div className="server-time-value">
+          {currentTime.toLocaleTimeString('id-ID', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+          })}
+        </div>
+        <div className="server-date">
+          {currentTime.toLocaleDateString('id-ID', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric'
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Tombol Bantuan dengan gaya manusiawi
+function HelpCTA({ onClick, disabled = false, isClicked = false }) {
+  if (isClicked) {
+    return null;
+  }
+
   return (
     <div className="help-cta">
       <button 
-        className={`help-btn ${disabled ? "disabled" : "bounce"}`} 
+        className={`help-btn ${disabled ? "disabled" : "pulse-animation"}`} 
         onClick={onClick}
         disabled={disabled}
       >
-        🆘 Tolong
+        <span className="btn-icon">💬</span>
+        <span className="btn-text">Butuh Bantuan IT Support</span>
+        <span className="btn-arrow">→</span>
       </button>
       <div className="help-hint">
         {disabled 
-          ? "Server sedang offline. Silakan coba lagi nanti." 
-          : "Klik / Ketuk tombol di atas untuk membuat tiket"
+          ? "🔄 Sedang memulihkan koneksi..." 
+          : "Klik untuk berbicara dengan tim IT support"
         }
       </div>
     </div>
@@ -245,8 +308,12 @@ function HelpCTA({ onClick, disabled = false }) {
 function ConnectionStatus({ isOnline, lastChecked }) {
   return (
     <div className={`connection-status ${isOnline ? "online" : "offline"}`}>
-      <span className="status-dot"></span>
-      {isOnline ? "Server online" : "Server offline"}
+      <div className="status-indicator">
+        <div className={`status-dot ${isOnline ? "online-dot" : "offline-dot"}`}></div>
+      </div>
+      <span className="status-text">
+        {isOnline ? "Sistem Online" : "Sistem Offline"}
+      </span>
       {lastChecked && (
         <span className="last-checked">
           • {lastChecked.toLocaleTimeString()}
@@ -257,35 +324,53 @@ function ConnectionStatus({ isOnline, lastChecked }) {
 }
 
 function TypingDots() {
-  return <span className="typing" aria-label="Sedang mengetik"><i></i><i></i><i></i></span>;
-}
-
-function SuccessBig({ title = "Berhasil", subtitle = "" }) {
   return (
-    <div className="success-card pop-big">
-      <div className="check-wrap">
-        <svg className="check" viewBox="0 0 52 52">
-          <circle className="check__circle" cx="26" cy="26" r="25" fill="none"/>
-          <path className="check__check" fill="none" d="M14 27l7 7 17-17"/>
-        </svg>
+    <div className="typing-indicator">
+      <div className="typing-dots">
+        <div className="dot"></div>
+        <div className="dot"></div>
+        <div className="dot"></div>
       </div>
-      <div className="success-title">{title}</div>
-      {subtitle && <div className="success-sub">{subtitle}</div>}
+      <div className="typing-text">sedang mengetik...</div>
     </div>
   );
 }
 
-function RecapCard({ name, complaint, division, datetime }) {
-  const priority = String(division).trim().toLowerCase().includes("bod (urgent)") ? "High" : "Normal";
+function SuccessBig({ title = "Berhasil", subtitle = "" }) {
   return (
-    <div className="recap card-pop enter-pop">
-      <div className="recap-title">Rekap Keluhan</div>
+    <div className="success-card">
+      <div className="success-icon">
+        <div className="success-glow"></div>
+        <svg className="check-icon" viewBox="0 0 52 52">
+          <circle className="check-circle" cx="26" cy="26" r="25" fill="none"/>
+          <path className="check-mark" fill="none" d="M14 27l7 7 17-17"/>
+        </svg>
+      </div>
+      <div className="success-content">
+        <div className="success-title">{title}</div>
+        {subtitle && <div className="success-sub">{subtitle}</div>}
+      </div>
+    </div>
+  );
+}
+
+function RecapCard({ name, complaint, department, datetime }) {
+  const priority = String(department).trim().toLowerCase().includes("bod") ? "High" : "Normal";
+  return (
+    <div className="recap">
+      <div className="recap-header">
+        <div className="recap-title">📋 Ringkasan Laporan</div>
+        <div className="priority-badge">{priority}</div>
+      </div>
       <div className="recap-grid">
-        <div className="k">Nama</div><div className="v">{name || "-"}</div>
-        <div className="k">Divisi</div><div className="v">{division || "-"}</div>
-        <div className="k">Prioritas</div><div className="v"><b>{priority}</b></div>
-        <div className="k">Keluhan</div><div className="v">"{complaint || "-"}"</div>
-        <div className="k">Tanggal & Waktu</div><div className="v">{datetime}</div>
+        <div className="k">👤 Nama</div><div className="v">{name || "-"}</div>
+        <div className="k">🏢 Departemen</div><div className="v">{department || "-"}</div>
+        <div className="k">🎯 Prioritas</div><div className="v"><b className={`priority ${priority.toLowerCase()}`}>{priority}</b></div>
+        <div className="k">💬 Keluhan</div><div className="v complaint">"{complaint || "-"}"</div>
+        <div className="k">⏰ Tanggal & Waktu</div><div className="v">{datetime}</div>
+      </div>
+      <div className="recap-footer">
+        <div className="note">Laporan ini telah dicatat oleh tim IT support</div>
       </div>
     </div>
   );
@@ -293,68 +378,72 @@ function RecapCard({ name, complaint, division, datetime }) {
 
 function UploadAsk({ onPick, hasPhoto, disabled = false }) {
   return (
-    <div className="upload-ask enter-pop">
-      <div>Silakan unggah foto kondisi keluhanmu ya.</div>
+    <div className="upload-ask">
+      <div className="upload-prompt">
+        <span className="icon">📸</span>
+        Ingin melampirkan foto untuk membantu tim IT memahami masalahnya?
+      </div>
       <button 
-        className={`pill-btn ${disabled ? "disabled" : ""}`} 
+        className={`pill-btn upload-btn ${disabled ? "disabled" : ""}`} 
         onClick={onPick}
         disabled={disabled}
       >
-        {hasPhoto ? "Ganti Foto" : "Pilih Foto"}
+        {hasPhoto ? "🔄 Ganti Foto" : "📷 Pilih Foto"}
       </button>
+      {!hasPhoto && (
+        <div className="upload-note">
+          Opsional - Foto bisa membantu kami memahami masalah dengan lebih baik
+        </div>
+      )}
     </div>
   );
 }
 
-function DivisionPicker({ current, options, onPick, disabled = false }) {
-  const divisionGroups = {
-    "Manajemen & Direksi": ["BOD (Urgent)", "Sekretarian Perusahaan", "Internal Audit"],
-    "Keuangan & Akuntansi": ["Keuangan", "Akuntansi"],
-    "Sumber Daya Manusia": ["HCM", "Manajemen Risiko"],
-    "Bisnis & Hukum": ["Legal", "Pemasaran", "Pengembangan Bisnis & Portofolio"],
-    "Teknologi & Sistem": ["TI & System", "Project Coordinator", "Proyek"],
-    "Operasional & Produksi": [
-      "Produksi & Peralatan", 
-      "Produksi & Peralatan WS 1", 
-      "Produksi & Peralatan WS 2",
-      "WS 1",
-      "WS 2",
-      "WWE",
-      "WSE"
-    ],
-    "Kualitas & Pengendalian": ["QHSE", "Pengendalian Proyek & SCM"]
-  };
-
+function DepartmentPicker({ current, onPick, disabled = false }) {
   return (
-    <div className="division-picker card-pop enter-pop">
-      <div className="division-picker-title">Pilih Divisi</div>
-      <div className="division-grid">
-        {Object.entries(divisionGroups).map(([groupName, groupOptions]) => (
-          <div key={groupName} className="division-group">
-            <div className="division-group-title">{groupName}</div>
-            <div className="division-options">
-              {groupOptions
-                .filter(opt => options.includes(opt))
-                .map((opt) => (
-                  <button
-                    key={opt}
-                    className={`division-option ${opt === current ? "active" : ""} ${disabled ? "disabled" : ""}`}
-                    onClick={() => !disabled && onPick(opt)}
-                    disabled={disabled}
-                  >
-                    {opt}
-                  </button>
-                ))}
+    <div className="department-picker">
+      <div className="picker-header">
+        <div className="department-picker-title">
+          🎯 Pilih Departemen Tujuan
+        </div>
+        <div className="picker-subtitle">
+          Kami akan mengarahkan laporan ke tim yang tepat
+        </div>
+      </div>
+      
+      <div className="department-grid-scroll">
+        {DEPARTMENT_STRUCTURE.map((group, index) => (
+          <div key={index} className="department-group">
+            <div className="department-group-title">
+              {group.title}
+            </div>
+            <div className="department-options">
+              {group.options.map((option) => (
+                <button
+                  key={option}
+                  className={`department-option ${option === current ? "option-active" : ""} ${disabled ? "disabled" : ""}`}
+                  onClick={() => !disabled && onPick(option)}
+                  disabled={disabled}
+                >
+                  <span className="option-text">{option}</span>
+                  {option === current && (
+                    <span className="option-check">✓</span>
+                  )}
+                </button>
+              ))}
             </div>
           </div>
         ))}
       </div>
-      <div className="division-note">
-        {disabled ? (
-          "Server offline - tidak dapat melanjutkan"
-        ) : (
-          <>Default: <b>{current || "Umum"}</b> — kamu bisa menggantinya di sini</>
-        )}
+      
+      <div className="department-picker-footer">
+        <div className="department-note">
+          {disabled ? (
+            "🔄 Sedang memulihkan koneksi..."
+          ) : (
+            <>Saat ini: <b className="current">{current || "Umum"}</b> — Kami siap mengarahkan laporan</>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -373,11 +462,20 @@ export default function ChatHost() {
     return acc?.name || c?.name || c?.preferred_username || acc?.username || "User";
   }, [accounts]);
 
-  const { name: userName, division: userDivision } = useMemo(
+  const { name: userName, department: userDepartment } = useMemo(
     () => readProfileFromMsal(accounts), [accounts]
   );
 
-  // stages: start -> needComplaint -> confirmComplaint -> needDivision -> needPhoto -> done
+  // Nama-nama support agent yang natural
+  const supportAgents = useMemo(() => [
+    "Andi", "Budi", "Sari", "Dewi", "Rizky", "Putri", "Ahmad", "Maya"
+  ], []);
+
+  const [currentAgent] = useState(() => 
+    supportAgents[Math.floor(Math.random() * supportAgents.length)]
+  );
+
+  // stages: start -> needComplaint -> confirmComplaint -> needDepartment -> needPhoto -> done
   const [stage, setStage] = useState("start");
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -385,14 +483,15 @@ export default function ChatHost() {
   const [complaint, setComplaint] = useState("");
   const [photoFile, setPhotoFile] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const [division, setDivision] = useState(userDivision || "Umum");
+  const [department, setDepartment] = useState(userDepartment || "Umum");
   const [showChatInput, setShowChatInput] = useState(false);
   const [error, setError] = useState(null);
+  const [helpButtonClicked, setHelpButtonClicked] = useState(false);
 
   // UI lock ketika tiket sudah dibuat atau server offline di awal
   const sessionLocked = stage === "done" || (!isOnline && stage === "start");
 
-  // sticky confirm bar (bukan lagi bubble di chat)
+  // sticky confirm bar
   const [showConfirm, setShowConfirm] = useState(false);
 
   const scroller = useRef(null);
@@ -416,67 +515,94 @@ export default function ChatHost() {
   };
   useEffect(scrollToBottom, [messages, isTyping, showConfirm]);
 
-  // greeting awal -> pakai tombol "🆘 Tolong"
+  // Greeting awal dengan gaya manusia
   useEffect(() => {
     setMessages([]);
     setIsTyping(true);
+    
+    const greetings = [
+      `Halo ${displayName}! 👋 Saya ${currentAgent} dari tim IT support. Ada yang bisa saya bantu hari ini?`,
+      `Hai ${displayName}! 😊 Saya ${currentAgent}. Ada kendala IT yang perlu dibantu?`,
+      `Selamat datang ${displayName}! 🤝 Saya ${currentAgent}, siap membantu masalah IT Anda.`
+    ];
+    
+    const randomGreeting = greetings[Math.floor(Math.random() * greetings.length)];
+    
     setTimeout(() => {
-      pushBot(<span className="enter-pop">Halo, <b>{displayName}</b>! Aku siap membantumu 😊</span>);
+      pushBot(
+        <div className="welcome-message">
+          <span className="agent-avatar">👨‍💻</span>
+          <span>{randomGreeting}</span>
+        </div>
+      );
       
       if (!isOnline) {
         pushBot(
           <div className="warning-message">
-            <strong>Peringatan:</strong> Server Helpdesk sedang offline. 
-            Kamu masih bisa membuat tiket, tetapi akan dikirim ketika koneksi pulih.
+            <strong>⚡ Perhatian:</strong> Saat ini sistem sedang offline. Saya akan mencatat laporan Anda sementara dan mengirimkannya saat koneksi pulih.
           </div>
         );
       }
       
       pushBot(
-        <div className="fade-in">
+        <div className="fade-in cta-container">
           {isOnline 
-            ? "Klik / ketuk tombol di bawah ini untuk menyampaikan keluhanmu."
-            : "Klik tombol di bawah untuk membuat tiket offline (akan dikirim nanti)."
+            ? `Klik tombol di bawah untuk mulai berbicara dengan saya`
+            : "Saya siap mencatat laporan Anda sementara"
           }
-          <HelpCTA onClick={startFlow} disabled={sessionLocked} />
+          <HelpCTA 
+            onClick={startFlow} 
+            disabled={sessionLocked}
+            isClicked={helpButtonClicked}
+          />
         </div>
       );
       setIsTyping(false);
       setStage("start");
       setShowChatInput(false);
       setError(null);
+      setHelpButtonClicked(false);
       scrollToBottom();
-    }, 400);
-  }, [displayName, isOnline]);
+    }, 800);
+  }, [displayName, isOnline, currentAgent]);
 
   function startFlow() {
     if (sessionLocked) return;
+    
+    // Set tombol sudah diklik (akan menghilang)
+    setHelpButtonClicked(true);
 
     if (!isOnline) {
-      // Mode offline - tetap lanjut tapi dengan peringatan
       pushBot(
         <div className="warning-message">
-          <strong>Mode Offline:</strong> Tiket akan disimpan secara lokal dan dikirim ketika server online.
+          <strong>🌐 Mode Offline:</strong> Saya akan menyimpan laporan sementara dan mengirimkannya saat sistem online kembali.
         </div>
       );
     }
 
     setIsTyping(true);
     setTimeout(() => {
-      pushUser("🆘 Tolong");
+      pushUser("Butuh Bantuan IT Support");
+      
+      const botResponses = [
+        `Oke! Silakan ceritakan detail masalah IT yang Anda hadapi. Saya akan bantu analisis dan arahkan ke tim yang tepat!`,
+        `Baik! Coba deskripsikan masalahnya. Semakin detail, semakin mudah saya memahami dan membantu menyelesaikannya.`,
+        `Siap! Silakan ceritakan masalah IT yang dialami - kapan mulai terjadi, gejalanya seperti apa, dan dampaknya bagaimana?`
+      ];
+      
+      const randomResponse = botResponses[Math.floor(Math.random() * botResponses.length)];
+      
       pushBot(
-        <span className="slide-up">
-          {isOnline 
-            ? "Siapkan detailnya ya. Silakan tulis keluhanmu."
-            : "Mode offline. Silakan tulis keluhanmu (akan dikirim nanti)."
-          }
-        </span>
+        <div className="response-message">
+          <span className="agent-avatar">👨‍💻</span>
+          <span>{randomResponse}</span>
+        </div>
       );
       setStage("needComplaint");
       setIsTyping(false);
       setShowChatInput(true);
       setError(null);
-    }, 200);
+    }, 500);
   }
 
   const handleSend = () => {
@@ -491,9 +617,14 @@ export default function ChatHost() {
     if (stage === "start") {
       setIsTyping(true);
       setTimeout(() => {
-        pushBot(<span>Untuk membuat tiket, klik tombol <b>🆘 Tolong</b> ya.</span>);
+        pushBot(
+          <div className="response-message">
+            <span className="agent-avatar">👨‍💻</span>
+            <span>Untuk memulai, klik tombol <b>"Butuh Bantuan IT Support"</b> ya!</span>
+          </div>
+        );
         setIsTyping(false);
-      }, 250);
+      }, 300);
       return;
     }
 
@@ -501,32 +632,59 @@ export default function ChatHost() {
       setComplaint(text);
       setIsTyping(true);
       setTimeout(() => {
+        const confirmResponses = [
+          `Saya memahami: "${text}" - Apakah ini sudah lengkap atau ada yang ingin ditambahkan?`,
+          `Saya catat: "${text}" - Mau tambah detail atau sudah cukup untuk saya proses?`,
+          `Saya pahami: "${text}" - Apakah ini sudah mencakup semua informasi yang perlu saya ketahui?`
+        ];
+        
+        const randomConfirm = confirmResponses[Math.floor(Math.random() * confirmResponses.length)];
+        
         pushBot(
-          <span>
-            Oke, keluhan kamu: <b>{text}</b>. Apakah itu saja? Ketik <b>"ya"</b> untuk konfirmasi
-            atau <b>"tidak"</b> untuk menambahkan.
-          </span>
+          <div className="response-message">
+            <span className="agent-avatar">👨‍💻</span>
+            <span>
+              {randomConfirm} 
+              <br/><br/>
+              Ketik <b>"ya"</b> untuk konfirmasi, <b>"tidak"</b> untuk merevisi
+            </span>
+          </div>
         );
         setStage("confirmComplaint");
         setIsTyping(false);
-      }, 250);
+      }, 500);
       return;
     }
 
     if (stage === "confirmComplaint") {
-      if (yesWords.has(text.toLowerCase())) {
+      const lowerText = text.toLowerCase();
+      
+      if (yesWords.has(lowerText)) {
         setIsTyping(true);
         setTimeout(() => {
           pushBot(
-            <DivisionPicker
-              current={division}
-              options={DIVISION_OPTIONS}
+            <DepartmentPicker
+              current={department}
               onPick={(val) => {
-                setDivision(val);
+                setDepartment(val);
                 pushUser(val);
                 setIsTyping(true);
                 setTimeout(() => {
-                  pushBot(<RecapCard name={userName} complaint={complaint} division={val} datetime={nowStr()} />);
+                  const recapResponses = [
+                    "Departemen dipilih! Ini ringkasan laporan yang sudah saya buat:",
+                    "Target departemen sudah ditetapkan! Berikut ringkasan laporan Anda:",
+                    "Baik! Saya telah memproses data. Ini ringkasan lengkap laporannya:"
+                  ];
+                  
+                  const randomRecap = recapResponses[Math.floor(Math.random() * recapResponses.length)];
+                  
+                  pushBot(
+                    <div className="response-message">
+                      <span className="agent-avatar">👨‍💻</span>
+                      <span>{randomRecap}</span>
+                    </div>
+                  );
+                  pushBot(<RecapCard name={userName} complaint={complaint} department={val} datetime={nowStr()} />);
                   pushBot(
                     <UploadAsk 
                       onPick={() => fileInputRef.current?.click()} 
@@ -537,30 +695,55 @@ export default function ChatHost() {
                   setStage("needPhoto");
                   setIsTyping(false);
                   
-                  // Auto-show confirm jika offline (karena tidak perlu upload foto)
                   if (!isOnline) {
                     setShowConfirm(true);
                   }
-                }, 200);
+                }, 400);
               }}
               disabled={!isOnline}
             />
           );
-          setStage("needDivision");
+          setStage("needDepartment");
           setIsTyping(false);
-        }, 250);
+        }, 400);
+      } else if (noWords.has(lowerText)) {
+        setIsTyping(true);
+        setTimeout(() => {
+          const retryResponses = [
+            "Oke! Silakan tulis ulang keluhannya dengan lebih detail:",
+            "Baik! Mari perbaiki deskripsinya. Silakan ceritakan lagi dengan lebih lengkap:",
+            "Saya pahami! Silakan revisi penjelasan masalahnya:"
+          ];
+          
+          const randomRetry = retryResponses[Math.floor(Math.random() * retryResponses.length)];
+          
+          pushBot(
+            <div className="response-message">
+              <span className="agent-avatar">👨‍💻</span>
+              <span>{randomRetry}</span>
+            </div>
+          );
+          setStage("needComplaint");
+          setIsTyping(false);
+        }, 400);
       } else {
         setIsTyping(true);
         setTimeout(() => {
-          pushBot(<span>Oke, silakan tulis ulang keluhanmu.</span>);
-          setStage("needComplaint");
+          pushBot(
+            <div className="response-message">
+              <span className="agent-avatar">👨‍💻</span>
+              <span>
+                Maaf, saya kurang paham. Ketik <b>"ya"</b> untuk konfirmasi, atau <b>"tidak"</b> untuk merevisi keluhan
+              </span>
+            </div>
+          );
           setIsTyping(false);
-        }, 250);
+        }, 400);
       }
       return;
     }
 
-    if (stage === "needDivision") return;
+    if (stage === "needDepartment") return;
     if (stage === "needPhoto") return;
   };
 
@@ -588,14 +771,25 @@ export default function ChatHost() {
     setPhotoFile(f);
     setError(null);
 
-    // Buat URL object untuk preview
     const url = URL.createObjectURL(f);
     pushBot(
-      <div className="img-preview fade-in">
+      <div className="img-preview">
+        <div className="image-header">🖼️ Foto Terlampir</div>
         <img src={url} alt="Preview lampiran" onLoad={() => URL.revokeObjectURL(url)} />
-        <div className="img-caption">Foto diterima: {f.name}</div>
+        <div className="img-caption">Terima kasih, foto ini akan membantu kami memahami masalah</div>
       </div>
     );
+    
+    setIsTyping(true);
+    setTimeout(() => {
+      pushBot(
+        <div className="response-message">
+          <span className="agent-avatar">👨‍💻</span>
+          <span>Foto berhasil diupload! Ini akan sangat membantu tim teknis</span>
+        </div>
+      );
+      setIsTyping(false);
+    }, 400);
 
     setShowConfirm(true);
   };
@@ -614,12 +808,10 @@ export default function ChatHost() {
   const getPhotoUrl = (photoPath) => {
     if (!photoPath) return null;
     
-    // Jika sudah full URL, gunakan langsung
     if (photoPath.startsWith('http')) {
       return photoPath;
     }
     
-    // Jika relative path, gabungkan dengan base URL
     const baseUrl = getBaseUrl();
     return `${baseUrl}${photoPath}`;
   };
@@ -631,18 +823,17 @@ export default function ChatHost() {
       setSubmitting(true);
       setError(null);
       
-      // Validasi data sebelum mengirim - PASTIKAN SEMUA FIELD ADA
       const ticketData = {
         name: userName || "User",
-        division: division || "Umum",
+        department: department || "Umum",
         description: complaint || "",
         photo: photoFile
       };
 
       console.log("Data tiket yang akan dikirim:", ticketData);
 
-      if (!ticketData.name || !ticketData.division || !ticketData.description) {
-        throw new Error(`Data tidak lengkap: name="${ticketData.name}", division="${ticketData.division}", description="${ticketData.description}"`);
+      if (!ticketData.name || !ticketData.department || !ticketData.description) {
+        throw new Error(`Data tidak lengkap: name="${ticketData.name}", department="${ticketData.department}", description="${ticketData.description}"`);
       }
 
       if (isOnline) {
@@ -650,7 +841,7 @@ export default function ChatHost() {
 
         const res = await createTicket({
           name: ticketData.name,
-          division: ticketData.division,
+          department: ticketData.department,
           description: ticketData.description,
           photo: ticketData.photo
         });
@@ -663,18 +854,17 @@ export default function ChatHost() {
           return arr;
         });
 
-        // sukses → kunci UI, sembunyikan confirm bar, animasi sukses
         setShowConfirm(false);
         setStage("done");
 
-        // Tampilkan foto jika ada (untuk backend yang sudah support URL)
         if (res?.ticket?.photo) {
           const photoUrl = getPhotoUrl(res.ticket.photo);
           if (photoUrl) {
             pushBot(
-              <div className="img-preview fade-in">
+              <div className="img-preview">
+                <div className="image-header">🖼️ Foto Terkirim</div>
                 <img src={photoUrl} alt="Lampiran tiket" />
-                <div className="img-caption">Foto terkirim ke sistem</div>
+                <div className="img-caption">Foto telah terintegrasi dengan sistem tiket</div>
               </div>
             );
           }
@@ -682,21 +872,29 @@ export default function ChatHost() {
 
         pushBot(
           <SuccessBig
-            title="Tiket Berhasil Dibuat"
+            title="✅ Laporan Berhasil Dikirim!"
             subtitle={`Nomor tiket: ${res?.ticket?.ticketNo || res?.ticketId || "-"}`}
           />
         );
 
+        const closingMessages = [
+          "Terima kasih! Laporan Anda sudah kami terima. Tim IT akan segera menghubungi Anda.",
+          "Laporan berhasil dikirim! Kami akan memprosesnya dan memberikan update secepatnya.",
+          "Sukses! Tiket sudah dibuat. Tim teknis akan menindaklanjuti sesuai prioritas."
+        ];
+        
+        const randomClosing = closingMessages[Math.floor(Math.random() * closingMessages.length)];
+        
         pushBot(
-          <span className="enter-pop">
-            Terima kasih telah menggunakan <b>IT Helpdesk</b>. Tim IT WKI akan segera menghubungimu. 🙌
-          </span>
+          <div className="response-message">
+            <span className="agent-avatar">👨‍💻</span>
+            <span>{randomClosing}</span>
+          </div>
         );
       } else {
-        // Mode offline - simpan ke localStorage
         const offlineTicket = {
           name: ticketData.name,
-          division: ticketData.division,
+          department: ticketData.department,
           description: ticketData.description,
           photo: ticketData.photo ? await fileToBase64(ticketData.photo) : null,
           createdAt: new Date().toISOString(),
@@ -713,15 +911,19 @@ export default function ChatHost() {
 
         pushBot(
           <SuccessBig
-            title="Tiket Disimpan (Offline)"
-            subtitle="Tiket akan dikirim otomatis ketika server online"
+            title="💾 Laporan Disimpan (Offline)"
+            subtitle="Akan otomatis terkirim saat online"
           />
         );
 
         pushBot(
-          <span className="enter-pop">
-            Tiket telah disimpan secara offline. Akan dikirim otomatis ketika koneksi pulih. 🙌
-          </span>
+          <div className="response-message">
+            <span className="agent-avatar">👨‍💻</span>
+            <span>
+              Laporan sudah saya simpan! Nanti akan otomatis terkirim saat koneksi pulih. 
+              Terima kasih atas kesabarannya.
+            </span>
+          </div>
         );
       }
     } catch (err) {
@@ -736,9 +938,10 @@ export default function ChatHost() {
 
       pushBot(
         <div className="error-message">
-          <strong>Gagal membuat tiket:</strong> {String(err?.message || "Terjadi kesalahan tidak terduga")}
-          <div style={{ marginTop: "8px", fontSize: "12px" }}>
-            Silakan hubungi IT support langsung atau coba lagi nanti.
+          <div className="error-header">❌ Gagal Mengirim Laporan</div>
+          <div className="error-detail">{String(err?.message || "Terjadi kendala tidak terduga")}</div>
+          <div className="error-suggestion">
+            Silakan hubungi IT support langsung atau coba lagi nanti
           </div>
         </div>
       );
@@ -755,26 +958,33 @@ export default function ChatHost() {
 
   const retryConnection = async () => {
     setIsTyping(true);
-    pushBot(<span>Memeriksa koneksi server...</span>);
+    pushBot(
+      <div className="response-message">
+        <span className="agent-avatar">👨‍💻</span>
+        <span>Sedang memeriksa koneksi server...</span>
+      </div>
+    );
     
     try {
       const connected = await testConnection();
       
       setIsTyping(false);
       if (connected) {
-        pushBot(<span className="success-message">Koneksi berhasil dipulihkan! 🎉</span>);
+        pushBot(
+          <div className="success-message">
+            <strong>✅ Koneksi Berhasil!</strong> Sistem sudah kembali online!
+          </div>
+        );
         
-        // Jika sebelumnya offline dan sekarang online, refresh UI state
         if (!isOnline) {
-          // Optional: reload page untuk reset state
           window.location.reload();
         }
       } else {
         pushBot(
           <div className="error-message">
-            Server masih offline. 
-            <div style={{ marginTop: "8px", fontSize: "12px" }}>
-              Pastikan backend di <code>https://it-backend-production.up.railway.app</code> sedang berjalan.
+            <div className="error-header">🌐 Masih Offline</div>
+            <div className="error-detail">
+              Pastikan backend di <code>https://it-backend-production.up.railway.app</code> aktif
             </div>
           </div>
         );
@@ -783,7 +993,8 @@ export default function ChatHost() {
       setIsTyping(false);
       pushBot(
         <div className="error-message">
-          Error saat test koneksi: {error.message}
+          <div className="error-header">⚡ Error Koneksi</div>
+          <div className="error-detail">{error.message}</div>
         </div>
       );
     }
@@ -791,20 +1002,21 @@ export default function ChatHost() {
 
   return (
     <div className="chat-root">
-      {/* header ala WhatsApp */}
-      <div className="chat-header glass">
+      {/* Header */}
+      <div className="chat-header">
         <div className="chat-peer">
-          <div className="avatar pop">{displayName?.[0]?.toUpperCase() || "U"}</div>
+          <div className="avatar">👨‍💻</div>
           <div className="peer-info">
-            <div className="peer-name">Helpdesk Chatbot</div>
+            <div className="peer-name">IT Support - {currentAgent}</div>
             <ConnectionStatus isOnline={isOnline} lastChecked={lastChecked} />
           </div>
         </div>
 
         <div className="header-right">
+          <ServerTimeHeader />
           <div className="user-mini">
-            <span className="user-name" title={`${userName} · ${division}`}>{userName}</span>
-            <span className="user-division">{division}</span>
+            <span className="user-name">{userName}</span>
+            <span className="user-department">{department}</span>
           </div>
           {!isOnline && (
             <button className="retry-btn" onClick={retryConnection} title="Coba koneksi lagi">
@@ -820,23 +1032,25 @@ export default function ChatHost() {
         </div>
       </div>
 
-      {/* area pesan */}
+      {/* Area Pesan */}
       <div className="chat-body" ref={scroller}>
         {messages.map((m, i) => (
-          <div key={i} className={`row ${m.side} enter`}>
-            <div className={`bubble ${m.side === "user" ? "me" : "bot"} enter-pop`}>{m.jsx}</div>
+          <div key={i} className={`row ${m.side}`}>
+            <div className={`bubble ${m.side === "user" ? "me user-message" : "bot bot-message"}`}>
+              {m.jsx}
+            </div>
           </div>
         ))}
 
         {isTyping && (
-          <div className="row bot enter">
+          <div className="row bot">
             <div className="bubble bot">
               <TypingDots />
             </div>
           </div>
         )}
 
-        {/* input file tersembunyi */}
+        {/* Input file tersembunyi */}
         <input
           ref={fileInputRef}
           type="file"
@@ -847,9 +1061,9 @@ export default function ChatHost() {
         />
       </div>
 
-      {/* sticky Confirm bar (muncul setelah pilih foto), auto-hilang saat done */}
+      {/* Sticky Confirm Bar */}
       {showConfirm && stage !== "done" && (
-        <div className="confirm-sticky slide-up">
+        <div className="confirm-sticky">
           <button
             className="confirm-btn"
             onClick={submitTicket}
@@ -857,16 +1071,16 @@ export default function ChatHost() {
             aria-disabled={submitting}
           >
             {submitting 
-              ? "Mengirim…" 
+              ? "⏳ Mengirim..." 
               : isOnline 
-                ? "Konfirmasi & Buat Tiket" 
-                : "Simpan Tiket (Offline)"
+                ? "✅ Konfirmasi & Kirim Laporan" 
+                : "💾 Simpan Sementara"
             }
           </button>
         </div>
       )}
 
-      {/* input bar — disable setelah tiket dibuat atau server offline */}
+      {/* Input Bar */}
       <div className={`chat-inputbar ${!showChatInput || sessionLocked ? "hidden" : ""}`}>
         <textarea
           rows={1}
@@ -875,18 +1089,20 @@ export default function ChatHost() {
           onKeyDown={onKeyDown}
           disabled={sessionLocked || !showChatInput}
           placeholder={
-            !isOnline && stage === "start" ? "Server offline - tunggu koneksi pulih" :
-            sessionLocked ? "Sesi selesai. Terima kasih 🙏" : 
-            "Tulis pesan… (Enter untuk kirim)"
+            !isOnline && stage === "start" ? "Sistem sedang offline - tunggu koneksi..." :
+            sessionLocked ? "✅ Laporan sudah selesai!" : 
+            "Ketik pesan... (Enter untuk kirim)"
           }
           aria-label="Ketik pesan"
+          className="input-field"
         />
         <button
           className="send-btn"
           onClick={handleSend}
-          aria-label="Kirim"
+          aria-label="Kirim pesan"
           disabled={sessionLocked || !showChatInput || !input.trim()}
         >
+          <span className="send-icon">📤</span>
           Kirim
         </button>
       </div>
