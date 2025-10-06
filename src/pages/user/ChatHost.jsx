@@ -19,7 +19,7 @@ export function getBaseUrl() {
 /* ===================== API Connection Test ===================== */
 async function testApiConnection() {
   try {
-    const url = apiUrl("/tickets"); 
+    const url = apiUrl("/health"); 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
@@ -156,22 +156,34 @@ const DEPARTMENT_STRUCTURE = [
 
 const DEPARTMENT_OPTIONS = DEPARTMENT_STRUCTURE.flatMap(group => group.options);
 
-/** Kirim tiket ke server */
-async function createTicket({ name, department = "", description, photo }) {
+/** Kirim tiket ke server - VERSION FIXED */
+async function createTicket({ name, division, description, photo }) {
+  // Validasi data lebih ketat
   const ticketData = {
-    name: String(name || "User").trim(),
-    department: String(department || "Umum").trim(),
+    name: String(name || "").trim(),
+    division: String(division || "").trim(),
     description: String(description || "").trim(),
-    priority: String(department).trim().toLowerCase().includes("bod") ? "High" : "Normal"
+    priority: String(division).trim().toLowerCase().includes("bod") ? "High" : "Normal"
   };
 
-  if (!ticketData.name || !ticketData.department || !ticketData.description) {
-    throw new Error(`Field yang diperlukan tidak lengkap: name="${ticketData.name}", department="${ticketData.department}", description="${ticketData.description}"`);
+  console.log("🔄 Membuat tiket dengan data:", ticketData);
+
+  // Validasi field required
+  if (!ticketData.name || ticketData.name === 'User') {
+    throw new Error("Nama tidak valid");
+  }
+  if (!ticketData.division || ticketData.division === 'Umum') {
+    throw new Error("Divisi harus dipilih");
+  }
+  if (!ticketData.description || ticketData.description.length < 5) {
+    throw new Error("Deskripsi keluhan harus diisi minimal 5 karakter");
   }
 
   const fd = new FormData();
+  
+  // Append dengan key yang tepat
   fd.append("name", ticketData.name);
-  fd.append("department", ticketData.department);
+  fd.append("division", ticketData.division);
   fd.append("priority", ticketData.priority);
   fd.append("description", ticketData.description);
   
@@ -179,52 +191,54 @@ async function createTicket({ name, department = "", description, photo }) {
     fd.append("photo", photo);
   }
 
-  console.log("Mengirim tiket dengan data:", ticketData);
-  console.log("API URL:", apiUrl("/tickets"));
+  // Debug FormData secara detail
+  console.log("📋 FormData contents:");
+  for (let pair of fd.entries()) {
+    console.log(`  ${pair[0]}:`, pair[1] ? (pair[0] === 'photo' ? `[File: ${pair[1].name}]` : `"${pair[1]}"`) : "EMPTY");
+  }
 
   const url = apiUrl("/tickets");
+  console.log("🌐 API URL:", url);
   
   try {
     const response = await fetch(url, {
       method: "POST",
       body: fd,
+      // ✅ JANGAN set Content-Type header untuk FormData
+      // Browser akan otomatis set dengan boundary
     });
 
-    console.log("Response status:", response.status);
+    console.log("📡 Response status:", response.status);
     
+    // Handle error responses
     if (!response.ok) {
-      let errorText = "Unknown error";
+      let errorMessage = `HTTP ${response.status}`;
+      
       try {
-        errorText = await response.text();
-        const errorJson = JSON.parse(errorText);
-        errorText = errorJson.message || errorJson.error || errorText;
+        const errorData = await response.json();
+        errorMessage = errorData.error || errorData.message || JSON.stringify(errorData);
       } catch (e) {
-        errorText = `HTTP ${response.status} - ${response.statusText}`;
+        // Jika response bukan JSON, baca sebagai text
+        const text = await response.text();
+        errorMessage = text || `HTTP ${response.status} - ${response.statusText}`;
       }
-      throw new Error(`Gagal membuat tiket (HTTP ${response.status}): ${errorText}`);
+      
+      throw new Error(errorMessage);
     }
 
-    const contentType = response.headers.get("content-type");
-    let result;
-    
-    if (contentType && contentType.includes("application/json")) {
-      result = await response.json();
-    } else {
-      const textResult = await response.text();
-      console.warn("Response bukan JSON:", textResult);
-      result = { success: true, message: "Tiket berhasil dibuat" };
-    }
-    
-    console.log("Ticket created successfully:", result);
+    // Handle success response
+    const result = await response.json();
+    console.log("✅ Ticket created successfully:", result);
     return result;
+    
   } catch (error) {
-    console.error("Error creating ticket:", error);
+    console.error("❌ Error creating ticket:", error);
     
     if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-      throw new Error(`Gagal terhubung ke server. Pastikan backend di ${url} dapat diakses dan mengizinkan CORS.`);
+      throw new Error(`Gagal terhubung ke server. Pastikan backend dapat diakses dan mengizinkan CORS.`);
     }
     
-    throw new Error(`Gagal membuat tiket: ${error.message}`);
+    throw error;
   }
 }
 
@@ -354,8 +368,8 @@ function SuccessBig({ title = "Berhasil", subtitle = "" }) {
   );
 }
 
-function RecapCard({ name, complaint, department, datetime }) {
-  const priority = String(department).trim().toLowerCase().includes("bod") ? "High" : "Normal";
+function RecapCard({ name, complaint, division, datetime }) {
+  const priority = String(division).trim().toLowerCase().includes("bod") ? "High" : "Normal";
   return (
     <div className="recap">
       <div className="recap-header">
@@ -364,7 +378,7 @@ function RecapCard({ name, complaint, department, datetime }) {
       </div>
       <div className="recap-grid">
         <div className="k">👤 Nama</div><div className="v">{name || "-"}</div>
-        <div className="k">🏢 Departemen</div><div className="v">{department || "-"}</div>
+        <div className="k">🏢 Divisi</div><div className="v">{division || "-"}</div>
         <div className="k">🎯 Prioritas</div><div className="v"><b className={`priority ${priority.toLowerCase()}`}>{priority}</b></div>
         <div className="k">💬 Keluhan</div><div className="v complaint">"{complaint || "-"}"</div>
         <div className="k">⏰ Tanggal & Waktu</div><div className="v">{datetime}</div>
@@ -404,7 +418,7 @@ function DepartmentPicker({ current, onPick, disabled = false }) {
     <div className="department-picker">
       <div className="picker-header">
         <div className="department-picker-title">
-          🎯 Pilih Departemen Tujuan
+          🎯 Pilih Divisi Tujuan
         </div>
         <div className="picker-subtitle">
           Kami akan mengarahkan laporan ke tim yang tepat
@@ -483,7 +497,7 @@ export default function ChatHost() {
   const [complaint, setComplaint] = useState("");
   const [photoFile, setPhotoFile] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const [department, setDepartment] = useState(userDepartment || "Umum");
+  const [division, setDivision] = useState(userDepartment || "Umum");
   const [showChatInput, setShowChatInput] = useState(false);
   const [error, setError] = useState(null);
   const [helpButtonClicked, setHelpButtonClicked] = useState(false);
@@ -664,15 +678,15 @@ export default function ChatHost() {
         setTimeout(() => {
           pushBot(
             <DepartmentPicker
-              current={department}
+              current={division}
               onPick={(val) => {
-                setDepartment(val);
+                setDivision(val);
                 pushUser(val);
                 setIsTyping(true);
                 setTimeout(() => {
                   const recapResponses = [
-                    "Departemen dipilih! Ini ringkasan laporan yang sudah saya buat:",
-                    "Target departemen sudah ditetapkan! Berikut ringkasan laporan Anda:",
+                    "Divisi dipilih! Ini ringkasan laporan yang sudah saya buat:",
+                    "Target divisi sudah ditetapkan! Berikut ringkasan laporan Anda:",
                     "Baik! Saya telah memproses data. Ini ringkasan lengkap laporannya:"
                   ];
                   
@@ -684,7 +698,7 @@ export default function ChatHost() {
                       <span>{randomRecap}</span>
                     </div>
                   );
-                  pushBot(<RecapCard name={userName} complaint={complaint} department={val} datetime={nowStr()} />);
+                  pushBot(<RecapCard name={userName} complaint={complaint} division={val} datetime={nowStr()} />);
                   pushBot(
                     <UploadAsk 
                       onPick={() => fileInputRef.current?.click()} 
@@ -823,31 +837,41 @@ export default function ChatHost() {
       setSubmitting(true);
       setError(null);
       
+      // Validasi data sebelum dikirim
       const ticketData = {
         name: userName || "User",
-        department: department || "Umum",
+        division: division || "Umum",
         description: complaint || "",
         photo: photoFile
       };
 
-      console.log("Data tiket yang akan dikirim:", ticketData);
+      console.log("📤 Data tiket yang akan dikirim:", ticketData);
 
-      if (!ticketData.name || !ticketData.department || !ticketData.description) {
-        throw new Error(`Data tidak lengkap: name="${ticketData.name}", department="${ticketData.department}", description="${ticketData.description}"`);
+      // Validasi ketat sebelum kirim
+      if (!ticketData.name || ticketData.name === "User") {
+        throw new Error("Nama tidak valid - silakan login ulang");
+      }
+      if (!ticketData.division || ticketData.division === "Umum") {
+        throw new Error("Silakan pilih divisi yang sesuai");
+      }
+      if (!ticketData.description || ticketData.description.trim().length < 5) {
+        throw new Error("Deskripsi keluhan harus diisi minimal 5 karakter");
       }
 
       if (isOnline) {
         pushBot(<TypingDots />);
 
+        console.log("🚀 Mengirim tiket ke server...");
         const res = await createTicket({
           name: ticketData.name,
-          department: ticketData.department,
+          division: ticketData.division,
           description: ticketData.description,
           photo: ticketData.photo
         });
 
         setSubmitting(false);
 
+        // Remove typing indicator
         setMessages((m) => {
           const arr = m.slice();
           if (arr.length && String(arr[arr.length - 1]?.jsx?.type?.name || "") === "TypingDots") arr.pop();
@@ -857,19 +881,7 @@ export default function ChatHost() {
         setShowConfirm(false);
         setStage("done");
 
-        if (res?.ticket?.photo) {
-          const photoUrl = getPhotoUrl(res.ticket.photo);
-          if (photoUrl) {
-            pushBot(
-              <div className="img-preview">
-                <div className="image-header">🖼️ Foto Terkirim</div>
-                <img src={photoUrl} alt="Lampiran tiket" />
-                <div className="img-caption">Foto telah terintegrasi dengan sistem tiket</div>
-              </div>
-            );
-          }
-        }
-
+        // Show success message
         pushBot(
           <SuccessBig
             title="✅ Laporan Berhasil Dikirim!"
@@ -892,9 +904,10 @@ export default function ChatHost() {
           </div>
         );
       } else {
+        // Offline mode handling
         const offlineTicket = {
           name: ticketData.name,
-          department: ticketData.department,
+          division: ticketData.division,
           description: ticketData.description,
           photo: ticketData.photo ? await fileToBase64(ticketData.photo) : null,
           createdAt: new Date().toISOString(),
@@ -930,6 +943,9 @@ export default function ChatHost() {
       setSubmitting(false);
       setError(err.message);
 
+      console.error("❌ Error dalam submitTicket:", err);
+
+      // Remove typing indicator
       setMessages((m) => {
         const arr = m.slice();
         if (arr.length && String(arr[arr.length - 1]?.jsx?.type?.name || "") === "TypingDots") arr.pop();
@@ -941,7 +957,7 @@ export default function ChatHost() {
           <div className="error-header">❌ Gagal Mengirim Laporan</div>
           <div className="error-detail">{String(err?.message || "Terjadi kendala tidak terduga")}</div>
           <div className="error-suggestion">
-            Silakan hubungi IT support langsung atau coba lagi nanti
+            Silakan cek koneksi internet atau hubungi IT support langsung
           </div>
         </div>
       );
@@ -1002,6 +1018,14 @@ export default function ChatHost() {
 
   return (
     <div className="chat-root">
+      {/* Background Elements */}
+      <div className="human-background-elements">
+        <div className="human-floating-orb orb-1"></div>
+        <div className="human-floating-orb orb-2"></div>
+        <div className="human-floating-orb orb-3"></div>
+        <div className="human-network-lines"></div>
+      </div>
+
       {/* Header */}
       <div className="chat-header">
         <div className="chat-peer">
@@ -1016,7 +1040,7 @@ export default function ChatHost() {
           <ServerTimeHeader />
           <div className="user-mini">
             <span className="user-name">{userName}</span>
-            <span className="user-department">{department}</span>
+            <span className="user-department">{division}</span>
           </div>
           {!isOnline && (
             <button className="retry-btn" onClick={retryConnection} title="Coba koneksi lagi">
