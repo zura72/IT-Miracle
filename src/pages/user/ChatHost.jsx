@@ -168,24 +168,24 @@ async function createTicket({ name, division, description, photo }) {
 
   console.log("🔄 Membuat tiket dengan data:", ticketData);
 
-  // Validasi field required
-  if (!ticketData.name || ticketData.name === 'User') {
+  // Validasi field required - lebih ketat
+  if (!ticketData.name || ticketData.name === 'User' || ticketData.name.trim() === '') {
     throw new Error("Nama tidak valid");
   }
-  if (!ticketData.division || ticketData.division === 'Umum') {
+  if (!ticketData.division || ticketData.division === 'Umum' || ticketData.division.trim() === '') {
     throw new Error("Divisi harus dipilih");
   }
-  if (!ticketData.description || ticketData.description.length < 5) {
+  if (!ticketData.description || ticketData.description.trim().length < 5) {
     throw new Error("Deskripsi keluhan harus diisi minimal 5 karakter");
   }
 
   const fd = new FormData();
   
-  // Append dengan key yang tepat
-  fd.append("name", ticketData.name);
-  fd.append("division", ticketData.division);
-  fd.append("priority", ticketData.priority);
-  fd.append("description", ticketData.description);
+  // Append dengan key yang tepat dan pastikan tidak ada nilai undefined
+  fd.append("name", ticketData.name || "");
+  fd.append("division", ticketData.division || "");
+  fd.append("priority", ticketData.priority || "Normal");
+  fd.append("description", ticketData.description || "");
   
   if (photo) {
     fd.append("photo", photo);
@@ -209,6 +209,7 @@ async function createTicket({ name, division, description, photo }) {
     });
 
     console.log("📡 Response status:", response.status);
+    console.log("📡 Response headers:", Object.fromEntries(response.headers.entries()));
     
     // Handle error responses
     if (!response.ok) {
@@ -216,10 +217,12 @@ async function createTicket({ name, division, description, photo }) {
       
       try {
         const errorData = await response.json();
+        console.log("❌ Error response data:", errorData);
         errorMessage = errorData.error || errorData.message || JSON.stringify(errorData);
       } catch (e) {
         // Jika response bukan JSON, baca sebagai text
         const text = await response.text();
+        console.log("❌ Error response text:", text);
         errorMessage = text || `HTTP ${response.status} - ${response.statusText}`;
       }
       
@@ -513,6 +516,19 @@ export default function ChatHost() {
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
 
+  // Debug state changes
+  useEffect(() => {
+    console.log("🔍 Division state changed:", division);
+  }, [division]);
+
+  useEffect(() => {
+    console.log("🔍 User name state changed:", userName);
+  }, [userName]);
+
+  useEffect(() => {
+    console.log("🔍 Complaint state changed:", complaint);
+  }, [complaint]);
+
   const pushBot  = (jsx) => {
     if (!mountedRef.current) return;
     setMessages((m) => Array.isArray(m) ? [...m, { side: "bot",  jsx }] : [{ side:"bot", jsx }]);
@@ -680,6 +696,7 @@ export default function ChatHost() {
             <DepartmentPicker
               current={division}
               onPick={(val) => {
+                console.log("🎯 Division selected:", val);
                 setDivision(val);
                 pushUser(val);
                 setIsTyping(true);
@@ -709,9 +726,8 @@ export default function ChatHost() {
                   setStage("needPhoto");
                   setIsTyping(false);
                   
-                  if (!isOnline) {
-                    setShowConfirm(true);
-                  }
+                  // Set showConfirm untuk online dan offline
+                  setShowConfirm(true);
                 }, 400);
               }}
               disabled={!isOnline}
@@ -837,7 +853,7 @@ export default function ChatHost() {
       setSubmitting(true);
       setError(null);
       
-      // Validasi data sebelum dikirim
+      // Validasi data sebelum dikirim - LEBIH KETAT
       const ticketData = {
         name: userName || "User",
         division: division || "Umum",
@@ -846,12 +862,14 @@ export default function ChatHost() {
       };
 
       console.log("📤 Data tiket yang akan dikirim:", ticketData);
+      console.log("📤 Division value:", division);
+      console.log("📤 User name:", userName);
 
       // Validasi ketat sebelum kirim
-      if (!ticketData.name || ticketData.name === "User") {
+      if (!ticketData.name || ticketData.name === "User" || ticketData.name.trim() === "") {
         throw new Error("Nama tidak valid - silakan login ulang");
       }
-      if (!ticketData.division || ticketData.division === "Umum") {
+      if (!ticketData.division || ticketData.division === "Umum" || ticketData.division.trim() === "") {
         throw new Error("Silakan pilih divisi yang sesuai");
       }
       if (!ticketData.description || ticketData.description.trim().length < 5) {
@@ -862,6 +880,13 @@ export default function ChatHost() {
         pushBot(<TypingDots />);
 
         console.log("🚀 Mengirim tiket ke server...");
+        console.log("🚀 Data yang dikirim:", {
+          name: ticketData.name,
+          division: ticketData.division,
+          description: ticketData.description,
+          hasPhoto: !!ticketData.photo
+        });
+
         const res = await createTicket({
           name: ticketData.name,
           division: ticketData.division,
